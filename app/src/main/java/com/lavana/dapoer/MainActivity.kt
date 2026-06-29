@@ -153,7 +153,7 @@ fun DapoerLavanaAppNavigation() {
                             downloadError = null
                             coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                 try {
-                                    var updateUrl = "https://raw.githubusercontent.com/dadangaziz/CAFE-ANDRO/main/apk/app-debug.apk" // Default fallback
+                                    var updateUrl = "https://raw.githubusercontent.com/dadang56/CAFE-ANDRO/main/apk/app-debug.apk" // Default fallback
                                     try {
                                         val bannerRows = com.lavana.dapoer.data.SupabaseClient.db["banners"].select {
                                             filter { eq("title", "app_apk_url") }

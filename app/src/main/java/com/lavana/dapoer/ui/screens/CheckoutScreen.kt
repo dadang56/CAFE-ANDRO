@@ -62,6 +62,44 @@ fun CheckoutScreen(
     onNavigateBack: () -> Unit,
     onOrderPlaced: (String) -> Unit
 ) {
+    if (CartManager.items.isEmpty()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Checkout Pesanan", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = DarkCharcoal)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                )
+            },
+            containerColor = LightGrayJco
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Keranjang Belanja Anda Kosong",
+                        fontWeight = FontWeight.Bold,
+                        color = DarkCharcoal
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onNavigateBack,
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeJco)
+                    ) {
+                        Text("Kembali ke Menu", color = Color.White)
+                    }
+                }
+            }
+        }
+        return
+    }
+
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     
@@ -402,18 +440,31 @@ fun CheckoutScreen(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Form Input Alamat
-                Text("Alamat Lengkap", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = addressInput,
-                    onValueChange = { addressInput = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = OrangeJco,
-                        unfocusedBorderColor = Color.LightGray
+                if (orderType == "Dine In") {
+                    Text("Nomor Meja", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = tableNumberInput,
+                        onValueChange = { tableNumberInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = OrangeJco,
+                            unfocusedBorderColor = Color.LightGray
+                        )
                     )
-                )
+                } else {
+                    Text("Alamat Lengkap", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = addressInput,
+                        onValueChange = { addressInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = OrangeJco,
+                            unfocusedBorderColor = Color.LightGray
+                        )
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.height(20.dp))
@@ -451,132 +502,6 @@ fun CheckoutScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Pilihan Metode Pembayaran
-            Text("Pilih Metode Pembayaran", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            val paymentMethods = listOf("QRIS", "Transfer")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                paymentMethods.forEach { method ->
-                    val isSelected = selectedPayment == method
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(if (isSelected) LightOrangeJco else Color.White, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (isSelected) OrangeJco else Color.LightGray, RoundedCornerShape(8.dp))
-                            .clickable {
-                                selectedPayment = method
-                                uploadedFileName = null // reset upload jika pindah method
-                            }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(method, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = if (isSelected) OrangeJco else DarkCharcoal)
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(12.dp))
-                    .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-                    .padding(16.dp)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (selectedPayment == "QRIS") {
-                        Text(
-                            text = "Scan QRIS Resmi Dapoer Lavana",
-                            fontWeight = FontWeight.Bold,
-                            color = DarkCharcoal,
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        val displayQrisUrl = if (qrisUrl.isNotBlank()) qrisUrl else "https://mtjyggxyjojcvcjxiblo.supabase.co/storage/v1/object/public/menu-images/qris_barcode.png"
-                        
-                        AsyncImage(
-                            model = displayQrisUrl,
-                            contentDescription = "QRIS Barcode",
-                            modifier = Modifier
-                                .size(180.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
-                                .background(Color.White),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else { // Transfer
-                        Text(
-                            text = "Transfer Ke Rekening Resmi",
-                            fontWeight = FontWeight.Bold,
-                            color = DarkCharcoal,
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = LightOrangeJco.copy(alpha = 0.5f)),
-                            border = BorderStroke(1.dp, OrangeJco.copy(alpha = 0.5f))
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Bank:", fontSize = 12.sp, color = Color.Gray)
-                                    Text(bankName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Nomor Rekening:", fontSize = 12.sp, color = Color.Gray)
-                                    Text(bankNo, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Nama Penerima:", fontSize = 12.sp, color = Color.Gray)
-                                    Text(bankOwner, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
-                                }
-                            }
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Unggah Bukti Pembayaran",
-                        fontWeight = FontWeight.Bold,
-                        color = DarkCharcoal,
-                        fontSize = 12.sp,
-                        modifier = Modifier.align(Alignment.Start)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    
-                    val imagePickerLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.GetContent()
-                    ) { uri ->
-                        if (uri != null) {
-                            uploadedFileName = "bukti_bayar_${System.currentTimeMillis()}.jpg"
-                        }
-                    }
-                    
-                    Button(
-                        onClick = { imagePickerLauncher.launch("image/*") },
-                        modifier = Modifier.fillMaxWidth().height(45.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = LightOrangeJco),
-                        border = BorderStroke(1.dp, OrangeJco)
-                    ) {
-                        Text(
-                            text = uploadedFileName ?: "Pilih Gambar Bukti Bayar",
-                            color = OrangeJco,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-            
             if (errorPlaceOrder != null) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -597,24 +522,21 @@ fun CheckoutScreen(
                     errorPlaceOrder = null
                     coroutineScope.launch {
                         try {
-                            val currentSubtotal = if (CartManager.items.isEmpty()) 24000.0 else subtotal
-                            val currentTotal = if (CartManager.items.isEmpty()) (if (orderType == "Delivery") 24000.0 + deliveryFee else 24000.0) else totalPayment
-                            
                             val currentUserId = SupabaseClient.currentUserId
  
                             val newOrder = Order(
                                 userId = currentUserId,
-                                orderType = "Delivery",
+                                orderType = orderType,
                                 status = "Pending",
-                                tableNumber = null,
-                                deliveryAddress = addressInput,
-                                deliveryDistanceKm = distanceKm,
-                                deliveryFee = deliveryFee,
-                                subtotal = currentSubtotal,
-                                total = currentTotal,
-                                paymentMethod = selectedPayment,
-                                paymentStatus = if (selectedPayment == "Tunai") "Belum Bayar" else "Menunggu Verifikasi",
-                                coordinates = "${userLocation.latitude},${userLocation.longitude}",
+                                tableNumber = if (orderType == "Dine In") tableNumberInput else null,
+                                deliveryAddress = if (orderType == "Delivery") addressInput else null,
+                                deliveryDistanceKm = if (orderType == "Delivery") distanceKm else null,
+                                deliveryFee = if (orderType == "Delivery") deliveryFee else 0.0,
+                                subtotal = subtotal,
+                                total = totalPayment,
+                                paymentMethod = "Belum Memilih",
+                                paymentStatus = "Belum Bayar",
+                                coordinates = if (orderType == "Delivery") "${userLocation.latitude},${userLocation.longitude}" else null,
                                 notes = "Dipesan via Android App"
                             )
                             
@@ -636,16 +558,11 @@ fun CheckoutScreen(
                                     )
                                 }
                             } else {
-                                // Fallback demo items jika cart kosong
-                                listOf(
-                                    OrderItem(orderId = orderId, menuItemId = "jco-1", quantity = 2, priceAtOrder = 12000.0)
-                                )
+                                emptyList()
                             }
                             
-                            try {
+                            if (itemsToInsert.isNotEmpty()) {
                                 SupabaseClient.db["order_items"].insert(itemsToInsert)
-                            } catch (e: Exception) {
-                                // Jika menu item id 1 tidak ada di Supabase karena seeding custom, biarkan lanjut
                             }
                             
                             // 3. Bersihkan keranjang

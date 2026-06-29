@@ -284,11 +284,19 @@ fun DapoerLavanaAppNavigation() {
         composable("home") {
             HomeScreen(
                 onOrderTypeSelected = { orderType ->
-                    navController.navigate("checkout/$orderType")
+                    if (com.lavana.dapoer.data.SupabaseClient.currentUserId == null) {
+                        navController.navigate("login")
+                    } else {
+                        navController.navigate("checkout/$orderType")
+                    }
                 },
                 onNavigateToCart = {
-                    val orderType = CartManager.selectedOrderType ?: "Dine In"
-                    navController.navigate("checkout/$orderType")
+                    if (com.lavana.dapoer.data.SupabaseClient.currentUserId == null) {
+                        navController.navigate("login")
+                    } else {
+                        val orderType = CartManager.selectedOrderType ?: "Dine In"
+                        navController.navigate("checkout/$orderType")
+                    }
                 },
                 onLogout = {
                     navController.navigate("login") {

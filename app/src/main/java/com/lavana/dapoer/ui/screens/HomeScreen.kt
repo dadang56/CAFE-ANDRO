@@ -598,7 +598,23 @@ fun JcoProductCard(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     // Add quantity / Cart action
-                    if (quantity == 0) {
+                    if (!item.isAvailable) {
+                        Button(
+                            onClick = {},
+                            enabled = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(28.dp),
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.LightGray,
+                                disabledContainerColor = Color.LightGray
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("Habis", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    } else if (quantity == 0) {
                         Button(
                             onClick = onAddToCart,
                             modifier = Modifier

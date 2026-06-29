@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -290,6 +291,17 @@ fun TabAdminOrders() {
                             },
                             onPrintReceipt = {
                                 fetchPrintItems(order)
+                            },
+                            onRejectPayment = { reason ->
+                                coroutineScope.launch {
+                                    try {
+                                        SupabaseClient.db["orders"].update({
+                                            set("payment_status", "Ditolak")
+                                            set("notes", "[Ditolak: $reason]")
+                                        }) { filter { eq("id", order.id ?: "") } }
+                                        refreshData()
+                                    } catch (e: Exception) {}
+                                }
                             }
                         )
                     }
@@ -648,8 +660,11 @@ fun AdminOrderCard(
     onAccept: () -> Unit,
     onAssignDriverClick: () -> Unit,
     onShowReceipt: (String) -> Unit,
-    onPrintReceipt: () -> Unit
+    onPrintReceipt: () -> Unit,
+    onRejectPayment: (String) -> Unit
 ) {
+    var showRejectDialog by remember { mutableStateOf(false) }
+    var rejectReasonInput by remember { mutableStateOf("") }
     val assignedDriverName = remember(order.driverId, drivers) {
         drivers.find { it.id == order.driverId }?.name ?: "Belum Ditugaskan"
     }
@@ -738,13 +753,25 @@ fun AdminOrderCard(
                 Spacer(modifier = Modifier.weight(1f))
                 when (order.status) {
                     "Pending" -> {
-                        Button(
-                            onClick = onAccept,
-                            colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(36.dp)
-                        ) {
-                            Text("Konfirmasi Pembayaran", fontSize = 12.sp, color = Color.White)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (order.paymentStatus == "Menunggu Verifikasi") {
+                                Button(
+                                    onClick = { showRejectDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    Text("Tolak Pembayaran", fontSize = 12.sp, color = Color.White)
+                                }
+                            }
+                            Button(
+                                onClick = onAccept,
+                                colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Text("Konfirmasi Pembayaran", fontSize = 12.sp, color = Color.White)
+                            }
                         }
                     }
                     "Diproses" -> {
@@ -761,6 +788,43 @@ fun AdminOrderCard(
                 }
             }
         }
+    }
+
+    if (showRejectDialog) {
+        AlertDialog(
+            onDismissRequest = { showRejectDialog = false },
+            title = { Text("Tolak Pembayaran", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Masukkan alasan penolakan pembayaran:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = rejectReasonInput,
+                        onValueChange = { rejectReasonInput = it },
+                        placeholder = { Text("Contoh: Bukti transfer tidak valid/belum masuk") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (rejectReasonInput.isNotBlank()) {
+                            onRejectPayment(rejectReasonInput)
+                            showRejectDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Tolak", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRejectDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
     }
 }
 
@@ -890,6 +954,24 @@ fun TabAdminMenu() {
                                     color = if (item.isAvailable) ForestGreen else Color.Red
                                 )
                             }
+                            Switch(
+                                checked = item.isAvailable,
+                                onCheckedChange = { isChecked ->
+                                    coroutineScope.launch {
+                                        try {
+                                            SupabaseClient.db["menu_items"].update({
+                                                set("is_available", isChecked)
+                                            }) { filter { eq("id", item.id) } }
+                                            loadMenu()
+                                        } catch (e: Exception) {}
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = ForestGreen,
+                                    checkedTrackColor = ForestGreen.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier.scale(0.8f)
+                            )
                             IconButton(onClick = {
                                 selectedMenuForEdit = item
                             }) {

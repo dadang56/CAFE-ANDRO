@@ -2,6 +2,11 @@ package com.lavana.dapoer.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import io.github.jan.supabase.storage.storage
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import android.widget.Toast
 import androidx.compose.ui.text.font.FontFamily
 import com.lavana.dapoer.data.*
@@ -54,6 +59,18 @@ fun TrackingScreen(
     var isLoading by remember { mutableStateOf(true) }
     var showReceiptDialog by remember { mutableStateOf(false) }
 
+    var qrisUrl by remember { mutableStateOf("") }
+    var bankName by remember { mutableStateOf("BCA") }
+    var bankNo by remember { mutableStateOf("1234567890") }
+    var bankOwner by remember { mutableStateOf("Dapoer Lavana") }
+
+    var selectedPayment by remember { mutableStateOf("QRIS") }
+    var uploadedFileName by remember { mutableStateOf<String?>(null) }
+    var uploadedFileUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var isUploadingPayment by remember { mutableStateOf(false) }
+    var uploadError by remember { mutableStateOf<String?>(null) }
+    var showThankYouDialog by remember { mutableStateOf(false) }
+
     fun loadOrder() {
         coroutineScope.launch {
             try {
@@ -63,6 +80,27 @@ fun TrackingScreen(
                     }
                 }.decodeSingle<Order>()
                 order = fetched
+
+                // Fetch payment settings from banners table
+                try {
+                    val bannerList = SupabaseClient.db["banners"].select().decodeList<BannerItem>()
+                    val qrisBanner = bannerList.firstOrNull { it.title == "payment_qris" }
+                    if (qrisBanner != null && qrisBanner.imageUrl.isNotBlank()) {
+                        qrisUrl = qrisBanner.imageUrl
+                    }
+                    
+                    val bankBanner = bannerList.firstOrNull { it.title?.startsWith("payment_bank|") == true }
+                    if (bankBanner != null && bankBanner.title != null) {
+                        val parts = bankBanner.title.split("|")
+                        if (parts.size >= 4) {
+                            bankName = parts[1]
+                            bankNo = parts[2]
+                            bankOwner = parts[3]
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
 
                 // Fetch menu list to map names
                 menuList = SupabaseClient.initializeMenuIfEmpty()
@@ -138,6 +176,15 @@ fun TrackingScreen(
     }
     
     val orderType = order?.orderType ?: "Delivery"
+    
+    val rejectionReason = remember(order?.notes) {
+        val notes = order?.notes ?: ""
+        if (notes.contains("[Ditolak: ")) {
+            notes.substringAfter("[Ditolak: ").substringBefore("]")
+        } else {
+            "Alasan tidak ditentukan oleh admin."
+        }
+    }
     
     var driverAccount by remember { mutableStateOf<StaffAccount?>(null) }
     LaunchedEffect(order?.driverId) {
@@ -251,6 +298,200 @@ fun TrackingScreen(
                         border = BorderStroke(1.dp, OrangeJco)
                     ) {
                         Text("Lihat Resi / Struk", color = OrangeJco, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+            
+            if (order != null && (order?.paymentStatus == "Belum Bayar" || order?.paymentStatus == "Ditolak")) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, OrangeJco),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (order?.paymentStatus == "Ditolak") "Pembayaran Ditolak Admin" else "Penyelesaian Pembayaran",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = if (order?.paymentStatus == "Ditolak") Color.Red else OrangeJco
+                        )
+                        
+                        if (order?.paymentStatus == "Ditolak") {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Alasan: $rejectionReason",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.Red
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Silakan pilih metode pembayaran dan unggah bukti transfer:", fontSize = 12.sp, color = DarkCharcoal)
+                        
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("QRIS", "Transfer").forEach { method ->
+                                val isSelected = selectedPayment == method
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(if (isSelected) LightOrangeJco else Color.White, RoundedCornerShape(8.dp))
+                                        .border(1.dp, if (isSelected) OrangeJco else Color.LightGray, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            selectedPayment = method
+                                        }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = method,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) OrangeJco else DarkCharcoal
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(LightGrayJco, RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                if (selectedPayment == "QRIS") {
+                                    Text("Scan QRIS Resmi Dapoer Lavana", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    val displayQrisUrl = if (qrisUrl.isNotBlank()) qrisUrl else "https://mtjyggxyjojcvcjxiblo.supabase.co/storage/v1/object/public/menu-images/qris_barcode.png"
+                                    AsyncImage(
+                                        model = displayQrisUrl,
+                                        contentDescription = "QRIS Barcode",
+                                        modifier = Modifier
+                                            .size(150.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
+                                            .background(Color.White),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else {
+                                    Text("Transfer Ke Rekening Resmi", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Bank:", fontSize = 11.sp, color = Color.Gray)
+                                            Text(bankName, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = DarkCharcoal)
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Nomor Rekening:", fontSize = 11.sp, color = Color.Gray)
+                                            Text(bankNo, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = DarkCharcoal)
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Nama Penerima:", fontSize = 11.sp, color = Color.Gray)
+                                            Text(bankOwner, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = DarkCharcoal)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Unggah Bukti Pembayaran", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        val imagePickerLauncher = rememberLauncherForActivityResult(
+                            contract = ActivityResultContracts.GetContent()
+                        ) { uri ->
+                            if (uri != null) {
+                                uploadedFileUri = uri
+                                uploadedFileName = "bukti_bayar_${orderId}_${System.currentTimeMillis()}.jpg"
+                            }
+                        }
+                        
+                        Button(
+                            onClick = { imagePickerLauncher.launch("image/*") },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = LightOrangeJco),
+                            border = BorderStroke(1.dp, OrangeJco)
+                        ) {
+                            Text(
+                                text = uploadedFileName ?: "Pilih Gambar Bukti Bayar",
+                                color = OrangeJco,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        
+                        if (uploadError != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(uploadError!!, color = Color.Red, fontSize = 11.sp)
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Button(
+                            onClick = {
+                                if (uploadedFileUri == null) {
+                                    uploadError = "Silakan pilih gambar bukti bayar terlebih dahulu!"
+                                    return@Button
+                                }
+                                isUploadingPayment = true
+                                uploadError = null
+                                coroutineScope.launch {
+                                    try {
+                                        var publicUrl = "https://mtjyggxyjojcvcjxiblo.supabase.co/storage/v1/object/public/menu-images/qris_barcode.png"
+                                        try {
+                                            val inputStream = context.contentResolver.openInputStream(uploadedFileUri!!)
+                                            val bytes = inputStream?.readBytes()
+                                            inputStream?.close()
+                                            if (bytes != null) {
+                                                val fileName = uploadedFileName ?: "bukti_bayar_${orderId}.jpg"
+                                                val bucket = SupabaseClient.storage.from("menu-images")
+                                                bucket.upload(fileName, bytes)
+                                                publicUrl = "${SupabaseClient.SUPABASE_URL}/storage/v1/object/public/menu-images/$fileName"
+                                            }
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
+                                        
+                                        SupabaseClient.db["orders"].update({
+                                            set("payment_status", "Menunggu Verifikasi")
+                                            set("payment_method", selectedPayment)
+                                            set("payment_receipt_url", publicUrl)
+                                        }) { filter { eq("id", orderId) } }
+                                        
+                                        isUploadingPayment = false
+                                        showThankYouDialog = true
+                                        loadOrder()
+                                    } catch (e: Exception) {
+                                        uploadError = "Gagal memproses pembayaran: ${e.localizedMessage}"
+                                        isUploadingPayment = false
+                                    }
+                                }
+                            },
+                            enabled = !isUploadingPayment,
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeJco)
+                        ) {
+                            Text(
+                                text = if (isUploadingPayment) "Mengirim..." else "Konfirmasi Pembayaran",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -380,6 +621,21 @@ fun TrackingScreen(
                     orderItems = orderItems,
                     menuItemsMap = menuItemsMap,
                     onDismiss = { showReceiptDialog = false }
+                )
+            }
+            if (showThankYouDialog) {
+                AlertDialog(
+                    onDismissRequest = { showThankYouDialog = false },
+                    title = { Text("Terima Kasih", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+                    text = { Text("Pesanan Anda akan segera kami proses.", color = DarkCharcoal) },
+                    confirmButton = {
+                        Button(
+                            onClick = { showThankYouDialog = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeJco)
+                        ) {
+                            Text("OK", color = Color.White)
+                        }
+                    }
                 )
             }
         }

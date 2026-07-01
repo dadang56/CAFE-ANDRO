@@ -1,0 +1,53 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100"
+    android:tint="#13807A">
+    <!-- Batang gandum -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M50,97 L50,27" />
+    <!-- Butir puncak -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M50,27 C45,20 47,13 50,8 C53,13 55,20 50,27 Z" />
+    <!-- Pasangan butir (kiri & kanan) menurun -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M50,33 C43,32 38,27 36,20 M50,33 C57,32 62,27 64,20" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M50,45 C43,44 38,39 36,32 M50,45 C57,44 62,39 64,32" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M50,57 C43,56 38,51 36,44 M50,57 C57,56 62,51 64,44" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M50,69 C43,68 38,63 36,56 M50,69 C57,68 62,63 64,56" />
+    <!-- Dua daun di batang bawah -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M50,80 C42,80 35,84 31,90 M50,80 C58,80 65,84 69,90" />
+</vector>

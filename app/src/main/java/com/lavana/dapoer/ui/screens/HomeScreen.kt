@@ -115,9 +115,15 @@ fun HomeScreen(
 
         try {
             val fetchedBanners = SupabaseClient.db["banners"].select().decodeList<BannerItem>()
-            val filtered = fetchedBanners.filter { it.title?.startsWith("payment_") != true }
-            if (filtered.isNotEmpty()) {
-                bannerList = filtered
+            // Hanya banner promo asli: kecualikan kategori, URL apk, info bank, dan yang tanpa gambar.
+            // Di-set tanpa syarat agar saat admin menghapus semua banner, promo ikut kosong.
+            bannerList = fetchedBanners.filter { b ->
+                val t = b.title ?: ""
+                b.imageUrl.isNotBlank() &&
+                    !t.startsWith("payment_") &&
+                    !t.startsWith("category|") &&
+                    t != "app_apk_url" &&
+                    !t.startsWith("bank_")
             }
         } catch (e: Exception) {}
         isLoadingMenu = false
@@ -270,7 +276,7 @@ fun TabBeranda(
     Box(modifier = Modifier.fillMaxSize().background(LightGrayJco)) {
         // Watermark halus agar area kosong tidak terlalu polos (di belakang konten)
         Image(
-            painter = painterResource(id = R.drawable.wm_coffee_bean),
+            painter = painterResource(id = R.drawable.wm_wheat),
             contentDescription = null,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -280,7 +286,7 @@ fun TabBeranda(
             alpha = 0.05f
         )
         Image(
-            painter = painterResource(id = R.drawable.wm_leaf),
+            painter = painterResource(id = R.drawable.wm_rice),
             contentDescription = null,
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -385,7 +391,9 @@ fun TabBeranda(
 
 
 
-        // Hot Promo Banner Section
+        // Hot Promo Banner Section — hanya tampil jika ada banner promo dari admin
+        val activeBanners = bannerList
+        if (activeBanners.isNotEmpty()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -415,16 +423,6 @@ fun TabBeranda(
             )
         }
 
-        val fallbackBanners = remember {
-            listOf(
-                BannerItem("1", "https://images.unsplash.com/photo-1612240498936-65f5101365d2?w=800", "Your Favorite Picks Bundle"),
-                BannerItem("2", "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=800", "Dapoer Lavana Coffee Combo Deal"),
-                BannerItem("3", "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=800", "Sweet Assorted Box Promo")
-            )
-        }
-        val activeBanners = if (bannerList.isNotEmpty()) bannerList else fallbackBanners
-
-        if (activeBanners.isNotEmpty()) {
             val pagerState = rememberPagerState(pageCount = { activeBanners.size })
             
             LaunchedEffect(pagerState) {

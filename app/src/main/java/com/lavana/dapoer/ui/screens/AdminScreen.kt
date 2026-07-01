@@ -3325,15 +3325,73 @@ fun ManageCategoriesDialog(
             containerColor = Color.White,
             title = { Text("Hapus Kategori \"$delCat\"?", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
             text = {
+                val productNames = remember(delCat) { mutableStateOf<List<String>>(emptyList()) }
+                LaunchedEffect(delCat) {
+                    try {
+                        productNames.value = SupabaseClient.db["menu_items"].select {
+                            filter { eq("category", delCat) }
+                        }.decodeList<MenuItem>().map { it.name }
+                    } catch (e: Exception) { e.printStackTrace() }
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "Kategori ini masih punya $delCount produk. Pilih kategori tujuan untuk memindahkan produk tersebut — setelah itu kategori \"$delCat\" akan dihapus.",
+                        "Kategori ini masih punya $delCount produk:",
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
-                    if (targets.isEmpty()) {
-                        Text("Tidak ada kategori lain sebagai tujuan. Tambahkan kategori lain dulu.", color = Color.Red, fontSize = 12.sp)
-                    } else {
+                    if (productNames.value.isNotEmpty()) {
+                        Text(
+                            productNames.value.joinToString(", "),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DarkCharcoal
+                        )
+                    }
+                    Text("Pilih tindakan:", fontSize = 12.sp, color = Color.Gray)
+
+                    // Opsi merah: hapus kategori beserta seluruh produknya (selalu tersedia).
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isSaving) {
+                                isSaving = true
+                                coroutineScope.launch {
+                                    try {
+                                        SupabaseClient.db["menu_items"].delete { filter { eq("category", delCat) } }
+                                        SupabaseClient.db["banners"].delete { filter { eq("title", "category|$delCat") } }
+                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                            CUSTOM_CATEGORIES.remove(delCat)
+                                            DYNAMIC_CATEGORIES.remove(delCat)
+                                            categoryToDelete = null
+                                        }
+                                        onCategoriesUpdated()
+                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                            android.widget.Toast.makeText(context, "Kategori \"$delCat\" beserta $delCount produk dihapus.", android.widget.Toast.LENGTH_LONG).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                        android.widget.Toast.makeText(context, "Gagal menghapus: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        isSaving = false
+                                    }
+                                }
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = RedPromo.copy(alpha = 0.08f)),
+                        border = BorderStroke(1.dp, RedPromo.copy(alpha = 0.4f))
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.DeleteForever, contentDescription = null, tint = RedPromo, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Hapus kategori & semua produknya", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = RedPromo)
+                        }
+                    }
+
+                    if (targets.isNotEmpty()) {
+                        Text("Atau pindahkan produk ke kategori lain lalu hapus:", fontSize = 12.sp, color = Color.Gray)
                         targets.forEach { target ->
                             Card(
                                 modifier = Modifier

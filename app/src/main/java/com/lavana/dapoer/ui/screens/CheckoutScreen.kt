@@ -102,7 +102,7 @@ fun CheckoutScreen(
             ) {
                 // Watermark dekoratif halus di area kosong (di belakang konten)
                 Image(
-                    painter = painterResource(R.drawable.wm_coffee_bean),
+                    painter = painterResource(R.drawable.wm_wheat),
                     contentDescription = null,
                     modifier = Modifier
                         .size(150.dp)
@@ -111,7 +111,7 @@ fun CheckoutScreen(
                     alpha = 0.06f
                 )
                 Image(
-                    painter = painterResource(R.drawable.wm_leaf),
+                    painter = painterResource(R.drawable.wm_rice),
                     contentDescription = null,
                     modifier = Modifier
                         .size(160.dp)

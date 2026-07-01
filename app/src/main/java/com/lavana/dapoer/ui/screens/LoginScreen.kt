@@ -94,7 +94,7 @@ fun LoginScreen(
     ) {
         // Watermark halus agar area kosong tidak terlalu polos
         Image(
-            painter = painterResource(id = R.drawable.wm_coffee_bean),
+            painter = painterResource(id = R.drawable.wm_wheat),
             contentDescription = null,
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -104,7 +104,7 @@ fun LoginScreen(
             alpha = 0.06f
         )
         Image(
-            painter = painterResource(id = R.drawable.wm_leaf),
+            painter = painterResource(id = R.drawable.wm_rice),
             contentDescription = null,
             modifier = Modifier
                 .align(Alignment.BottomEnd)

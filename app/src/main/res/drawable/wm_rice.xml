@@ -1,0 +1,46 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100"
+    android:tint="#13807A">
+    <!-- Batang padi yang merunduk -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M28,97 C28,64 30,44 44,34 C57,25 70,22 82,18" />
+    <!-- Bulir padi menggantung sepanjang rundukan -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M44,34 C48,40 47,47 43,52" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M54,29 C58,35 57,42 53,47" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M64,25 C68,31 67,38 63,43" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M74,21 C78,27 77,34 73,39" />
+    <!-- Daun runcing -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M31,58 C24,60 18,66 15,74" />
+</vector>

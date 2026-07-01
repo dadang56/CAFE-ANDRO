@@ -41,7 +41,7 @@ fun ReceiptDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("DAPOER LAVANA", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = ForestGreen, fontFamily = FontFamily.Serif)
+                Text("DAPOER LAVANA", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = ForestGreen, fontFamily = FontFamily.SansSerif)
                 Text("Struk Pembayaran Digital", fontSize = 12.sp, color = ForestGreen.copy(alpha = 0.6f))
                 Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider(color = ForestGreen.copy(alpha = 0.3f), thickness = 1.dp)

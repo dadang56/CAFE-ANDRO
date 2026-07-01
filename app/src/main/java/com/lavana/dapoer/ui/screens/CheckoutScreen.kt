@@ -117,7 +117,7 @@ fun CheckoutScreen(
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
                         color = DarkCharcoal,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -851,7 +851,7 @@ private fun SectionHeader(
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = DarkCharcoal,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif
+                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif
             )
             if (subtitle != null) {
                 Text(subtitle, fontSize = 12.sp, color = DarkCharcoal.copy(alpha = 0.55f))

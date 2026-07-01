@@ -92,7 +92,7 @@ fun SplashScreen(onAnimationFinished: () -> Unit) {
                 color = Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Serif
+                fontFamily = FontFamily.SansSerif
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(

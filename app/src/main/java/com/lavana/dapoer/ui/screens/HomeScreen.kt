@@ -316,7 +316,7 @@ fun TabBeranda(
                         text = userName,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
                         color = Color.White
                     )
                     if (userEmail == null) {

@@ -185,7 +185,7 @@ fun LoginScreen(
                         text = "Dapoer Lavana",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif,
+                        fontFamily = FontFamily.SansSerif,
                         color = Color.White
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -220,7 +220,7 @@ fun LoginScreen(
                         text = "Selamat Datang!",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif,
+                        fontFamily = FontFamily.SansSerif,
                         color = DarkCharcoal,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Start
@@ -518,7 +518,7 @@ fun LoginScreen(
                         text = "Buat Akun",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif,
+                        fontFamily = FontFamily.SansSerif,
                         color = DarkCharcoal,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Start

@@ -272,7 +272,7 @@ fun TabAdminOrders() {
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
-                            fontFamily = FontFamily.Serif
+                            fontFamily = FontFamily.SansSerif
                         )
                         Text("Pantau pesanan masuk hari ini", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
                     }
@@ -971,7 +971,7 @@ fun TabAdminMenu() {
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontFamily = FontFamily.Serif
+                        fontFamily = FontFamily.SansSerif
                     )
                     Text("Atur katalog & ketersediaan produk", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
                 }
@@ -1523,7 +1523,7 @@ fun TabAdminBanners() {
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    fontFamily = FontFamily.Serif
+                    fontFamily = FontFamily.SansSerif
                 )
                 Text("Atur banner carousel di beranda pelanggan", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
             }
@@ -1812,7 +1812,7 @@ fun TabAdminReports() {
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontFamily = FontFamily.Serif
+                        fontFamily = FontFamily.SansSerif
                     )
                     Text("Rekap omset & transaksi selesai", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
                 }
@@ -3052,6 +3052,7 @@ fun ManageCategoriesDialog(
     var selectedCategoryToRename by remember { mutableStateOf<String?>(null) }
     var renameInput by remember { mutableStateOf("") }
     var newCategoryInput by remember { mutableStateOf("") }
+    var categoryToDelete by remember { mutableStateOf<Pair<String, Int>?>(null) }
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -3174,7 +3175,10 @@ fun ManageCategoriesDialog(
                                                             }.decodeList<MenuItem>().size
                                                             
                                                             if (count > 0) {
-                                                                 android.widget.Toast.makeText(context, "Tidak bisa menghapus: masih ada $count produk di kategori ini!", android.widget.Toast.LENGTH_LONG).show()
+                                                                 // Kategori masih berisi produk — tawarkan pindahkan produk lalu hapus.
+                                                                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                                     categoryToDelete = cat to count
+                                                                 }
                                                             } else {
                                                                  SupabaseClient.db["banners"].delete {
                                                                      filter { eq("title", "category|$cat") }
@@ -3299,6 +3303,81 @@ fun ManageCategoriesDialog(
             },
             dismissButton = {
                 TextButton(onClick = { selectedCategoryToRename = null }) {
+                    Text("Batal", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    // Konfirmasi hapus kategori yang masih berisi produk — pindahkan dulu ke kategori tujuan.
+    if (categoryToDelete != null) {
+        val delCat = categoryToDelete!!.first
+        val delCount = categoryToDelete!!.second
+        val targets = DYNAMIC_CATEGORIES.filter { it != delCat }
+        AlertDialog(
+            onDismissRequest = { if (!isSaving) categoryToDelete = null },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Hapus Kategori \"$delCat\"?", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Kategori ini masih punya $delCount produk. Pilih kategori tujuan untuk memindahkan produk tersebut — setelah itu kategori \"$delCat\" akan dihapus.",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                    if (targets.isEmpty()) {
+                        Text("Tidak ada kategori lain sebagai tujuan. Tambahkan kategori lain dulu.", color = Color.Red, fontSize = 12.sp)
+                    } else {
+                        targets.forEach { target ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !isSaving) {
+                                        isSaving = true
+                                        coroutineScope.launch {
+                                            try {
+                                                SupabaseClient.db["menu_items"].update({
+                                                    set("category", target)
+                                                }) { filter { eq("category", delCat) } }
+                                                SupabaseClient.db["banners"].delete {
+                                                    filter { eq("title", "category|$delCat") }
+                                                }
+                                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                    CUSTOM_CATEGORIES.remove(delCat)
+                                                    categoryToDelete = null
+                                                }
+                                                onCategoriesUpdated()
+                                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                    android.widget.Toast.makeText(context, "$delCount produk dipindah ke \"$target\". Kategori \"$delCat\" dihapus.", android.widget.Toast.LENGTH_LONG).show()
+                                                }
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                                android.widget.Toast.makeText(context, "Gagal menghapus kategori: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                            } finally {
+                                                isSaving = false
+                                            }
+                                        }
+                                    },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = LightGrayJco),
+                                border = BorderStroke(1.dp, LightOrangeJco)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("Pindahkan ke \"$target\"", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = DarkCharcoal)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { if (!isSaving) categoryToDelete = null }) {
                     Text("Batal", color = Color.Gray)
                 }
             }

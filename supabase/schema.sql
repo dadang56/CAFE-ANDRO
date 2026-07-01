@@ -95,7 +95,8 @@ INSERT INTO public.settings (key, value, description) VALUES
 ('delivery_base_distance_km', 2.0, 'Jarak minimum dalam KM untuk tarif dasar'),
 ('delivery_per_km_fee', 2500.0, 'Tarif tambahan per KM setelah jarak dasar terlewati'),
 ('delivery_max_distance_km', 15.0, 'Batas jarak pengiriman maksimum dalam KM'),
-('latest_version_code', 2.0, 'Versi aplikasi terbaru untuk pengecekan in-app update'),
+('latest_version_code', 12, 'versionCode APK terbaru. HARUS > versionCode app terpasang agar dialog update muncul. Naikkan tiap rilis (samakan dengan versionCode di build.gradle.kts). Deskripsi baris ini dipakai sebagai Catatan Rilis di dialog update.'),
+('force_update', 0, 'Set 1 untuk memaksa update (dialog tidak bisa ditutup), 0 untuk opsional (ada tombol Nanti)'),
 ('cafe_latitude', -6.2297, 'Latitude lokasi Dapoer Lavana Cafe'),
 ('cafe_longitude', 106.8296, 'Longitude lokasi Dapoer Lavana Cafe');
 

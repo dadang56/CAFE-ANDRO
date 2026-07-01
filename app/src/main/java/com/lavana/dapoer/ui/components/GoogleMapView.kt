@@ -1,19 +1,17 @@
 package com.lavana.dapoer.ui.components
 
-import android.os.Bundle
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng as GLatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import com.lavana.dapoer.ui.screens.LatLng
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.MapEventsOverlay
-import org.osmdroid.events.MapEventsReceiver
 
 @Composable
 fun GoogleMapView(
@@ -23,70 +21,43 @@ fun GoogleMapView(
     onMapClick: ((LatLng) -> Unit)? = null,
     zoom: Float = 15f
 ) {
-    val context = LocalContext.current
-    val currentOnMapClick by rememberUpdatedState(onMapClick)
-
-    val mapView = remember {
-        MapView(context).apply {
-            setMultiTouchControls(true)
-            // Prevent parent scroll container from stealing touch events from map
-            setOnTouchListener { view, event ->
-                view.parent.requestDisallowInterceptTouchEvent(true)
-                false
-            }
-        }
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(
+            GLatLng(center.latitude, center.longitude),
+            zoom
+        )
     }
 
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(lifecycle, mapView) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                else -> {}
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
-        }
+    LaunchedEffect(center, zoom) {
+        cameraPositionState.position = CameraPosition.fromLatLngZoom(
+            GLatLng(center.latitude, center.longitude),
+            zoom
+        )
     }
 
-    // Manage MapEventsOverlay dynamically to avoid stale lambda captures
-    DisposableEffect(mapView) {
-        val mapEventsReceiver = object : MapEventsReceiver {
-            override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                currentOnMapClick?.invoke(LatLng(p.latitude, p.longitude))
-                return true
-            }
-            override fun longPressHelper(p: GeoPoint): Boolean = false
+    GoogleMap(
+        modifier = modifier,
+        cameraPositionState = cameraPositionState,
+        uiSettings = MapUiSettings(
+            zoomControlsEnabled = true,
+            myLocationButtonEnabled = false
+        ),
+        onMapClick = { gLatLng ->
+            onMapClick?.invoke(LatLng(gLatLng.latitude, gLatLng.longitude))
         }
-        val overlay = MapEventsOverlay(mapEventsReceiver)
-        mapView.overlays.add(0, overlay)
-        onDispose {
-            mapView.overlays.remove(overlay)
+    ) {
+        markers.forEach { (latLng, title) ->
+            // rememberMarkerState hanya menerapkan posisi saat komposisi pertama, sehingga marker
+            // yang bergerak (live tracking kurir) akan diam di tempat. Hoist MarkerState yang stabil
+            // lalu dorong posisi terbaru setiap koordinat berubah.
+            val markerState = remember { MarkerState(position = GLatLng(latLng.latitude, latLng.longitude)) }
+            LaunchedEffect(latLng.latitude, latLng.longitude) {
+                markerState.position = GLatLng(latLng.latitude, latLng.longitude)
+            }
+            Marker(
+                state = markerState,
+                title = title
+            )
         }
     }
-
-    AndroidView(
-        factory = {
-            mapView
-        },
-        update = { map ->
-            map.overlays.removeIf { it is Marker }
-            markers.forEach { (latLng, title) ->
-                val marker = Marker(map).apply {
-                    position = GeoPoint(latLng.latitude, latLng.longitude)
-                    this.title = title
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                }
-                map.overlays.add(marker)
-            }
-            map.controller.setZoom(zoom.toDouble())
-            map.controller.setCenter(GeoPoint(center.latitude, center.longitude))
-            map.invalidate()
-        },
-        modifier = modifier
-    )
 }
-

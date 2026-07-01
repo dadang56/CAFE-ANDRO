@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -269,15 +270,15 @@ fun TabBeranda(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .background(Color(0xFFFAFAFA))
+            .background(LightGrayJco)
     ) {
-        // Solid Sage Green Guest/User Header Card with Minimalist Abstract Shapes
+        // Modern floating teal-gradient welcome header with rounded bottom corners
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-                .background(OrangeJco)
-                .padding(top = 28.dp, bottom = 28.dp, start = 20.dp, end = 20.dp)
+                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                .padding(top = 36.dp, bottom = 32.dp, start = 20.dp, end = 20.dp)
         ) {
             // Simple and minimalist background shapes
             Canvas(
@@ -305,30 +306,57 @@ fun TabBeranda(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Selamat Datang,",
                         fontSize = 14.sp,
-                        color = Color.White.copy(alpha = 0.8f)
+                        color = Color.White.copy(alpha = 0.85f)
                     )
                     Text(
                         text = userName,
-                        fontSize = 24.sp,
+                        fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
                         color = Color.White
                     )
                     if (userEmail == null) {
-                        Text(
-                            text = "Silahkan Login terlebih dahulu",
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.9f),
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
                             modifier = Modifier
-                                .padding(top = 2.dp)
-                                .clickable {
-                                    onNavigateToLogin()
-                                }
-                        )
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.White.copy(alpha = 0.18f))
+                                .clickable { onNavigateToLogin() }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Silahkan Login terlebih dahulu",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(10.dp)
+                            )
+                        }
                     }
+                }
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color.White.copy(alpha = 0.18f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
                 }
             }
         }
@@ -339,16 +367,23 @@ fun TabBeranda(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Hot Promo",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = DarkCharcoal
-            )
+            Column {
+                Text(
+                    text = "Hot Promo",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DarkCharcoal
+                )
+                Text(
+                    text = "Penawaran spesial untukmu",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
             Text(
                 text = "Lihat Semua",
                 fontSize = 13.sp,
@@ -384,18 +419,18 @@ fun TabBeranda(
 
             HorizontalPager(
                 state = pagerState,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                pageSpacing = 12.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(170.dp)
             ) { page ->
                 val banner = activeBanners[page]
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
                 ) {
                     AsyncImage(
                         model = banner.imageUrl,
@@ -410,16 +445,18 @@ fun TabBeranda(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp),
-                horizontalArrangement = Arrangement.Center
+                    .padding(top = 14.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 activeBanners.forEachIndexed { index, _ ->
+                    val selected = pagerState.currentPage == index
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 3.dp)
-                            .size(if (pagerState.currentPage == index) 16.dp else 6.dp, 6.dp)
+                            .size(if (selected) 22.dp else 8.dp, 8.dp)
                             .clip(CircleShape)
-                            .background(if (pagerState.currentPage == index) OrangeJco else Color.LightGray)
+                            .background(if (selected) OrangeJco else OrangeJco.copy(alpha = 0.22f))
                     )
                 }
             }
@@ -428,19 +465,27 @@ fun TabBeranda(
 
 
         // Apa yang ingin kamu cari? Section
-        Text(
-            text = "Apa yang ingin kamu cari ?",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = DarkCharcoal,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-        )
+        Column(
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 12.dp)
+        ) {
+            Text(
+                text = "Apa yang ingin kamu cari ?",
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = DarkCharcoal
+            )
+            Text(
+                text = "Pilih kategori menu favoritmu",
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+        }
 
         // Categories Pills List
         val categories = listOf("All") + MENU_CATEGORIES
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             items(categories) { category ->
@@ -449,13 +494,16 @@ fun TabBeranda(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .background(if (isSelected) OrangeJco else Color.White)
-                        .border(
-                            1.dp,
-                            if (isSelected) OrangeJco else Color.LightGray.copy(alpha = 0.5f),
-                            RoundedCornerShape(20.dp)
+                        .then(
+                            if (isSelected) Modifier
+                            else Modifier.border(
+                                1.dp,
+                                LightOrangeJco,
+                                RoundedCornerShape(20.dp)
+                            )
                         )
                         .clickable { selectedCategory = category }
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(horizontal = 18.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = category,
@@ -477,7 +525,15 @@ fun TabBeranda(
                     .height(200.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = OrangeJco)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = OrangeJco)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Memuat menu...",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
             }
         } else {
             // LazyVerticalGrid doesn't work inside nested verticalScroll naturally without setting height,
@@ -485,15 +541,15 @@ fun TabBeranda(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp)
+                    .padding(horizontal = 12.dp)
             ) {
                 val chunks = filteredItems.chunked(3)
                 chunks.forEach { rowItems ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         rowItems.forEach { item ->
                             Box(modifier = Modifier.weight(1f)) {
@@ -540,24 +596,48 @@ fun JcoProductCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Column {
-                // Food Image
-                AsyncImage(
-                    model = item.imageUrl,
-                    contentDescription = item.name,
-                    contentScale = ContentScale.Crop,
+                // Food Image Box
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(95.dp)
-                )
+                        .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                ) {
+                    AsyncImage(
+                        model = item.imageUrl,
+                        contentDescription = item.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(108.dp)
+                            .graphicsLayer { this.alpha = if (item.isAvailable) 1f else 0.5f }
+                    )
+                    if (!item.isAvailable) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(Color.Black.copy(alpha = 0.3f))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .background(Color.Red.copy(alpha = 0.8f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text("HABIS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                        }
+                    }
+                }
 
                 Column(
-                    modifier = Modifier.padding(6.dp)
+                    modifier = Modifier
+                        .padding(horizontal = 10.dp, vertical = 10.dp)
+                        .graphicsLayer { this.alpha = if (item.isAvailable) 1f else 0.6f }
                 ) {
                     // Item Title
                     Text(
@@ -569,14 +649,14 @@ fun JcoProductCard(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Spacer(modifier = Modifier.height(1.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
 
                     if (originalPrice != null && originalPrice > item.price) {
                         // Original Price (Strikethrough)
                         Text(
-                            text = String.format("%,.0f", originalPrice),
-                            fontSize = 8.sp,
-                            color = Color.LightGray,
+                            text = "Rp ${String.format("%,.0f", originalPrice)}",
+                            fontSize = 9.sp,
+                            color = Color.Gray,
                             textDecoration = TextDecoration.LineThrough
                         )
                     } else {
@@ -589,13 +669,13 @@ fun JcoProductCard(
 
                     // Current Promo Price
                     Text(
-                        text = String.format("%,.0f", item.price),
+                        text = "Rp ${String.format("%,.0f", item.price)}",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
+                        fontSize = 13.sp,
                         color = OrangeJco
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Add quantity / Cart action
                     if (!item.isAvailable) {
@@ -604,8 +684,8 @@ fun JcoProductCard(
                             enabled = false,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(28.dp),
-                            shape = RoundedCornerShape(6.dp),
+                                .height(34.dp),
+                            shape = RoundedCornerShape(11.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.LightGray,
                                 disabledContainerColor = Color.LightGray
@@ -619,21 +699,21 @@ fun JcoProductCard(
                             onClick = onAddToCart,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(28.dp),
-                            shape = RoundedCornerShape(6.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                                .height(34.dp),
+                            shape = RoundedCornerShape(11.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text("Beli", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Beli", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OnAccentDark)
                         }
                     } else {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(28.dp)
-                                .clip(RoundedCornerShape(6.dp))
+                                .height(34.dp)
+                                .clip(RoundedCornerShape(11.dp))
                                 .background(LightOrangeJco)
-                                .border(1.dp, OrangeJco, RoundedCornerShape(6.dp)),
+                                .border(1.dp, OrangeJco, RoundedCornerShape(11.dp)),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -666,13 +746,13 @@ fun JcoProductCard(
                 }
             }
 
-            // Top-left RED promo badge (Only if originalPrice exists and > current price)
+            // Top-left promo badge (Only if originalPrice exists and > current price)
             if (originalPrice != null && originalPrice > item.price) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(bottomEnd = 8.dp))
-                        .background(Color.Red)
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                        .clip(RoundedCornerShape(topStart = 18.dp, bottomEnd = 10.dp))
+                        .background(RedPromo)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "Promo",
@@ -687,17 +767,17 @@ fun JcoProductCard(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(24.dp)
-                    .background(Color.White.copy(alpha = 0.85f), CircleShape)
+                    .padding(6.dp)
+                    .size(26.dp)
+                    .background(Color.White.copy(alpha = 0.92f), CircleShape)
                     .clickable(onClick = onFavoriteClick),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = "Favorite",
-                    tint = if (isFavorite) Color.Red else Color.Gray,
-                    modifier = Modifier.size(12.dp)
+                    tint = if (isFavorite) OrangeAccent else Color.Gray,
+                    modifier = Modifier.size(14.dp)
                 )
             }
         }
@@ -817,27 +897,73 @@ fun TabOrderHistory(
             }
 
             if (isLoadingHistory) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = OrangeJco)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LightGrayJco),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = OrangeJco)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Memuat pesanan...", color = Color.Gray, fontSize = 12.sp)
+                    }
                 }
             } else if (filteredOrders.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Belum ada pesanan", color = Color.Gray, fontSize = 14.sp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LightGrayJco)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier
+                                .size(120.dp)
+                                .background(LightOrangeJco, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ReceiptLong,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = OrangeJco
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = "Belum ada pesanan",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkCharcoal,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Pesananmu akan muncul di sini",
+                            fontSize = 13.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(LightGrayJco)
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(filteredOrders) { order ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
-                            border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -966,26 +1092,42 @@ fun TabWishlist(
             )
         } else {
             if (wishlistItems.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LightGrayJco)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.FavoriteBorder,
-                            contentDescription = "Empty Wishlist",
-                            modifier = Modifier.size(90.dp),
-                            tint = OrangeJco.copy(alpha = 0.4f)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(120.dp)
+                                .background(LightOrangeJco, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FavoriteBorder,
+                                contentDescription = "Empty Wishlist",
+                                modifier = Modifier.size(64.dp),
+                                tint = OrangeJco
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(20.dp))
                         Text(
                             text = "Belum ada menu favorit",
-                            fontSize = 16.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = DarkCharcoal
+                            color = DarkCharcoal,
+                            textAlign = TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Ketuk ikon hati pada menu untuk menambahkan",
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
                             color = Color.Gray,
-                            modifier = Modifier.padding(top = 4.dp)
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
                 }
@@ -993,14 +1135,16 @@ fun TabWishlist(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(LightGrayJco)
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(wishlistItems) { item ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
-                            border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.4f))
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1013,25 +1157,29 @@ fun TabWishlist(
                                     contentDescription = item.name,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .size(60.dp)
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .size(64.dp)
+                                        .clip(RoundedCornerShape(14.dp))
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = item.name,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
-                                        color = DarkCharcoal
+                                        color = DarkCharcoal,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
+                                    Spacer(modifier = Modifier.height(3.dp))
                                     Text(
                                         text = "Rp ${String.format("%,.0f", item.price)}",
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
+                                        fontSize = 13.sp,
                                         color = OrangeJco
                                     )
                                 }
-                                
+                                Spacer(modifier = Modifier.width(10.dp))
+
                                 // Beli button
                                 Button(
                                     onClick = {
@@ -1041,12 +1189,12 @@ fun TabWishlist(
                                         CartManager.addItem(item)
                                         android.widget.Toast.makeText(context, "${item.name} berhasil ditambahkan ke keranjang", android.widget.Toast.LENGTH_SHORT).show()
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.height(30.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.height(38.dp),
+                                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp)
                                 ) {
-                                    Text("Beli", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("Beli", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -1456,7 +1604,7 @@ fun TabAkunDetail(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFAFAFA))
+            .background(LightGrayJco)
     ) {
         JcoOrangeTopBar(title = "Akun")
 
@@ -1475,9 +1623,9 @@ fun TabAkunDetail(
                             onLogout() // redirect to login
                         }
                     },
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -1559,9 +1707,9 @@ fun TabAkunDetail(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -1570,13 +1718,20 @@ fun TabAkunDetail(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = null,
-                                    tint = OrangeJco,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(LightOrangeJco, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = OrangeJco,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
                                     text = "Lokasi Pengantaran Utama",
                                     fontWeight = FontWeight.Bold,
@@ -1618,9 +1773,9 @@ fun TabAkunDetail(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column {
                     SettingsRowItem(
@@ -1670,12 +1825,12 @@ fun TabAkunDetail(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(52.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (userEmail != null) Color.White else OrangeJco,
-                    contentColor = if (userEmail != null) Color.Red else Color.White
+                    containerColor = if (userEmail != null) Color.White else OrangeAccent,
+                    contentColor = if (userEmail != null) Color.Red else OnAccentDark
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 border = if (userEmail != null) BorderStroke(1.dp, Color.Red) else null
             ) {
                 Text(
@@ -1771,7 +1926,7 @@ fun JcoOrangeTopBar(title: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(OrangeJco)
+            .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1841,14 +1996,14 @@ fun JcoGuestStateUI(
                 modifier = Modifier
                     .fillMaxWidth(0.8f)
                     .height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
                     text = buttonText,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = OnAccentDark
                 )
             }
         }
@@ -1886,6 +2041,7 @@ fun JcoBottomNavigation(
                 label = "Favorit",
                 icon = if (currentTab == 2) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 isSelected = currentTab == 2,
+                selectedColor = OrangeAccent,
                 onClick = { onTabSelected(2) }
             )
             JcoBottomTabItem(
@@ -1903,6 +2059,7 @@ fun JcoBottomTabItem(
     label: String,
     icon: ImageVector,
     isSelected: Boolean,
+    selectedColor: Color = OrangeJco,
     onClick: () -> Unit
 ) {
     Column(
@@ -1915,13 +2072,13 @@ fun JcoBottomTabItem(
             imageVector = icon,
             contentDescription = label,
             modifier = Modifier.size(24.dp),
-            tint = if (isSelected) OrangeJco else Color.Gray
+            tint = if (isSelected) selectedColor else Color.Gray
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label,
             fontSize = 10.sp,
-            color = if (isSelected) OrangeJco else Color.Gray,
+            color = if (isSelected) selectedColor else Color.Gray,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
     }

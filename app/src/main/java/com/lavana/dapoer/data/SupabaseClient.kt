@@ -38,21 +38,22 @@ object SupabaseClient {
 
     suspend fun initializeMenuIfEmpty(): List<MenuItem> {
         return try {
-            val fetched = db["menu_items"].select().decodeList<MenuItem>()
-            if (fetched.isEmpty()) {
-                val fallback = getFallbackMenu()
-                db["menu_items"].insert(fallback)
-                syncDynamicCategories(fallback)
-                fallback
-            } else {
-                syncDynamicCategories(fetched)
-                fetched
+            try {
+                val bannerList = db["banners"].select().decodeList<BannerItem>()
+                val customCats = bannerList
+                    .filter { it.title?.startsWith("category|") == true }
+                    .map { it.title!!.removePrefix("category|") }
+                CUSTOM_CATEGORIES.clear()
+                CUSTOM_CATEGORIES.addAll(customCats)
+            } catch (ex: Exception) {
+                ex.printStackTrace()
             }
+            val fetched = db["menu_items"].select().decodeList<MenuItem>()
+            syncDynamicCategories(fetched)
+            fetched
         } catch (e: Exception) {
             e.printStackTrace()
-            val fallback = getFallbackMenu()
-            syncDynamicCategories(fallback)
-            fallback
+            emptyList()
         }
     }
 

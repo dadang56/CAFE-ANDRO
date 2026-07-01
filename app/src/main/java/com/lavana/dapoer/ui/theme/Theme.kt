@@ -11,12 +11,12 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
-    primary = OrangeJco,
+    primary = OrangeJco,            // Teal
     onPrimary = White,
-    secondary = OrangeJco,
-    onSecondary = White,
+    secondary = OrangeAccent,       // Oranye untuk komponen aksen
+    onSecondary = OnAccentDark,
     tertiary = RedPromo,
-    background = LightGrayJco,
+    background = LightGrayJco,       // Mint
     onBackground = DarkCharcoal,
     surface = White,
     onSurface = DarkCharcoal

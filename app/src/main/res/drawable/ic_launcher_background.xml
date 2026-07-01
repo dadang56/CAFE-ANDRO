@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Base teal -->
+    <path
+        android:fillColor="#13807A"
+        android:pathData="M0,0 h108 v108 h-108 z" />
+    <!-- Soft lighter teal glow (top-right) for depth -->
+    <path
+        android:fillColor="#1A938B"
+        android:pathData="M108,0 m0,0 a46,46 0 1,0 -0.1,0 z" />
+    <!-- Darker teal pool (bottom) -->
+    <path
+        android:fillColor="#0B524E"
+        android:pathData="M0,108 m0,0 a52,40 0 1,1 108,0 z" />
+</vector>

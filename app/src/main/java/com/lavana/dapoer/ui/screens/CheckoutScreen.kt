@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,11 +17,17 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,7 +59,8 @@ import android.widget.Toast
 @Serializable
 data class SettingsRow(
     val key: String,
-    val value: Double
+    val value: Double,
+    val description: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,34 +73,73 @@ fun CheckoutScreen(
     if (CartManager.items.isEmpty()) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Checkout Pesanan", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = DarkCharcoal)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                        .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                ) {
+                    TopAppBar(
+                        title = { Text("Checkout Pesanan", fontWeight = FontWeight.Bold, color = Color.White) },
+                        navigationIcon = {
+                            IconButton(onClick = onNavigateBack) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = Color.White)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                    )
+                }
             },
             containerColor = LightGrayJco
         ) { innerPadding ->
             Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(110.dp)
+                            .clip(CircleShape)
+                            .background(LightOrangeJco),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ShoppingCart,
+                            contentDescription = null,
+                            tint = OrangeJco,
+                            modifier = Modifier.size(64.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
                         text = "Keranjang Belanja Anda Kosong",
                         fontWeight = FontWeight.Bold,
-                        color = DarkCharcoal
+                        fontSize = 20.sp,
+                        color = DarkCharcoal,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Tambahkan menu favorit Anda terlebih dahulu untuk melanjutkan pemesanan.",
+                        fontSize = 13.sp,
+                        color = DarkCharcoal.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(28.dp))
                     Button(
                         onClick = onNavigateBack,
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeJco)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OrangeAccent,
+                            contentColor = OnAccentDark
+                        )
                     ) {
-                        Text("Kembali ke Menu", color = Color.White)
+                        Text("Kembali ke Menu", color = OnAccentDark, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }
@@ -255,15 +302,155 @@ fun CheckoutScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Checkout Pesanan", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = DarkCharcoal)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                    .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+            ) {
+                TopAppBar(
+                    title = { Text("Checkout Pesanan", fontWeight = FontWeight.Bold, color = Color.White) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = Color.White)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        },
+        bottomBar = {
+            Surface(
+                color = Color.White,
+                shadowElevation = 12.dp,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                "Total Pembayaran",
+                                fontSize = 12.sp,
+                                color = DarkCharcoal.copy(alpha = 0.6f)
+                            )
+                            Text(
+                                "Rp ${String.format("%,.0f", totalPayment)}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp,
+                                color = OrangeJco
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(LightOrangeJco)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                "${CartManager.getItemsCount()} item",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OrangeJco
+                            )
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
-            )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    // Tombol "Pesan Sekarang" (Modern J.CO style)
+                    Button(
+                        onClick = {
+                            isPlacingOrder = true
+                            errorPlaceOrder = null
+                            coroutineScope.launch {
+                                try {
+                                    val currentUserId = SupabaseClient.currentUserId
+
+                                    val newOrder = Order(
+                                        userId = currentUserId,
+                                        orderType = orderType,
+                                        status = "Pending",
+                                        tableNumber = if (orderType == "Dine In") tableNumberInput else null,
+                                        deliveryAddress = if (orderType == "Delivery") addressInput else null,
+                                        deliveryDistanceKm = if (orderType == "Delivery") distanceKm else null,
+                                        deliveryFee = if (orderType == "Delivery") deliveryFee else 0.0,
+                                        subtotal = subtotal,
+                                        total = totalPayment,
+                                        paymentMethod = "Belum Memilih",
+                                        paymentStatus = "Belum Bayar",
+                                        coordinates = if (orderType == "Delivery") "${userLocation.latitude},${userLocation.longitude}" else null,
+                                        notes = "Dipesan via Android App"
+                                    )
+
+                                    // 1. Kirim order ke Supabase
+                                    val insertedOrder = SupabaseClient.db["orders"].insert(newOrder) {
+                                        select()
+                                    }.decodeSingle<Order>()
+
+                                    val orderId = insertedOrder.id!!
+
+                                    // 2. Kirim order items ke Supabase jika cart berisi
+                                    val itemsToInsert = if (CartManager.items.isNotEmpty()) {
+                                        CartManager.items.map { cartItem ->
+                                            OrderItem(
+                                                orderId = orderId,
+                                                menuItemId = cartItem.menuItem.id,
+                                                quantity = cartItem.quantity,
+                                                priceAtOrder = cartItem.menuItem.price
+                                            )
+                                        }
+                                    } else {
+                                        emptyList()
+                                    }
+
+                                    if (itemsToInsert.isNotEmpty()) {
+                                        SupabaseClient.db["order_items"].insert(itemsToInsert)
+                                    }
+
+                                    // 3. Bersihkan keranjang
+                                    CartManager.clearCart()
+                                    Toast.makeText(context, "Pesanan berhasil dibuat!", Toast.LENGTH_LONG).show()
+
+                                    // 4. Pindah ke Halaman Lacak
+                                    onOrderPlaced(orderId)
+                                } catch (e: Exception) {
+                                    errorPlaceOrder = "Gagal memproses pesanan: ${e.localizedMessage}"
+                                    Toast.makeText(context, "Gagal memproses pesanan: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                } finally {
+                                    isPlacingOrder = false
+                                }
+                            }
+                        },
+                        enabled = !isPlacingOrder,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                    ) {
+                        if (isPlacingOrder) {
+                            CircularProgressIndicator(
+                                color = OnAccentDark,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                        }
+                        Text(
+                            text = if (isPlacingOrder) "Memproses Pesanan..." else "Pesan Sekarang",
+                            color = OnAccentDark,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+            }
         },
         containerColor = LightGrayJco
     ) { innerPadding ->
@@ -274,324 +461,400 @@ fun CheckoutScreen(
                 .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
-            
+
             // JIKA DELIVERY: Tampilkan Peta Google Maps Interaktif
             if (orderType == "Delivery") {
-                Text(
-                    text = "Tentukan Lokasi Pengiriman",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = DarkCharcoal,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                // Search Address Row
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Cari alamat...") },
-                        label = { Text("Cari Lokasi") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        trailingIcon = {
-                            if (searchQuery.isNotBlank()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Clear")
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        SectionHeader(
+                            icon = Icons.Default.LocationOn,
+                            title = "Lokasi Pengiriman",
+                            subtitle = "Tentukan titik tujuan pesanan Anda"
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Search Address Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("Cari alamat...") },
+                                label = { Text("Cari Lokasi") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = OrangeJco,
+                                    unfocusedBorderColor = Color.LightGray
+                                ),
+                                trailingIcon = {
+                                    if (searchQuery.isNotBlank()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                                        }
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (searchQuery.isNotBlank()) {
+                                        isSearchingAddress = true
+                                        coroutineScope.launch {
+                                            searchSuggestions = com.lavana.dapoer.data.GeocodingHelper.searchAddress(searchQuery)
+                                            isSearchingAddress = false
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                                shape = RoundedCornerShape(14.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp)
+                            ) {
+                                Icon(Icons.Default.Search, contentDescription = "Cari", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+
+                        if (isSearchingAddress) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            CircularProgressIndicator(color = OrangeJco, modifier = Modifier.size(24.dp).align(Alignment.CenterHorizontally))
+                        }
+
+                        // Suggestions List
+                        if (searchSuggestions.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 160.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = LightGrayJco),
+                                border = BorderStroke(1.dp, LightOrangeJco)
+                            ) {
+                                LazyColumn(modifier = Modifier.padding(8.dp)) {
+                                    items(searchSuggestions) { result ->
+                                        Text(
+                                            text = result.displayName,
+                                            fontSize = 12.sp,
+                                            color = DarkCharcoal,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    addressInput = result.displayName
+                                                    userLocation = LatLng(result.latitude, result.longitude)
+                                                    searchSuggestions = emptyList()
+                                                    searchQuery = ""
+                                                }
+                                                .padding(vertical = 10.dp, horizontal = 6.dp)
+                                        )
+                                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                                    }
                                 }
                             }
                         }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Button(
-                        onClick = {
-                            if (searchQuery.isNotBlank()) {
-                                isSearchingAddress = true
-                                coroutineScope.launch {
-                                    searchSuggestions = com.lavana.dapoer.data.GeocodingHelper.searchAddress(searchQuery)
-                                    isSearchingAddress = false
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Scan GPS Button
+                        OutlinedButton(
+                            onClick = {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.5.dp, OrangeJco),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco)
+                        ) {
+                            Icon(Icons.Default.MyLocation, contentDescription = "GPS", tint = OrangeJco, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Gunakan Lokasi GPS Saat Ini", color = OrangeJco, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            "Ketuk peta untuk menentukan titik pengiriman",
+                            fontSize = 11.sp,
+                            color = DarkCharcoal.copy(alpha = 0.55f)
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(210.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, LightOrangeJco, RoundedCornerShape(16.dp))
+                        ) {
+                            GoogleMapView(
+                                center = userLocation,
+                                markers = listOf(
+                                    cafeLocation to "Dapoer Lavana",
+                                    userLocation to "Tujuan Pengiriman Anda"
+                                ),
+                                onMapClick = { p ->
+                                    userLocation = p
+                                    coroutineScope.launch {
+                                        val street = com.lavana.dapoer.data.GeocodingHelper.reverseGeocode(p.latitude, p.longitude)
+                                        if (street.isNotBlank()) {
+                                            addressInput = street
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Info Jarak & Ongkir
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(LightOrangeJco)
+                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                            ) {
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.MyLocation,
+                                            contentDescription = null,
+                                            tint = OrangeJco,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Jarak Antar", fontSize = 11.sp, color = DarkCharcoal.copy(alpha = 0.7f))
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(String.format("%.1f km", distanceKm), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OrangeJco)
                                 }
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) {
-                        Text("Cari", color = Color.White, fontSize = 12.sp)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(LightOrangeJco)
+                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                            ) {
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Receipt,
+                                            contentDescription = null,
+                                            tint = OrangeJco,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Ongkos Kirim", fontSize = 11.sp, color = DarkCharcoal.copy(alpha = 0.7f))
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Rp ${String.format("%,.0f", deliveryFee)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OrangeJco)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (orderType == "Dine In") {
+                            Text("Nomor Meja", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = tableNumberInput,
+                                onValueChange = { tableNumberInput = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = OrangeJco,
+                                    unfocusedBorderColor = Color.LightGray
+                                )
+                            )
+                        } else {
+                            Text("Alamat Lengkap", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Pastikan alamat sesuai dengan titik pada peta",
+                                fontSize = 11.sp,
+                                color = DarkCharcoal.copy(alpha = 0.55f)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = addressInput,
+                                onValueChange = { addressInput = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = OrangeJco,
+                                    unfocusedBorderColor = Color.LightGray
+                                )
+                            )
+                        }
                     }
                 }
 
-                if (isSearchingAddress) {
-                    CircularProgressIndicator(color = OrangeJco, modifier = Modifier.size(24.dp).align(Alignment.CenterHorizontally).padding(bottom = 8.dp))
-                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-                // Suggestions List
-                if (searchSuggestions.isNotEmpty()) {
-                    Card(
+            // Rincian Pesanan
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SectionHeader(
+                        icon = Icons.Default.ShoppingCart,
+                        title = "Rincian Pesanan",
+                        subtitle = "Atur jumlah item sebelum memesan"
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (CartManager.items.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(LightGrayJco)
+                                .padding(12.dp)
+                        ) {
+                            Text("Keranjang Anda kosong. Menggunakan item demo.", fontSize = 12.sp, color = DarkCharcoal.copy(alpha = 0.5f))
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OrderSummaryItem(name = "Alcapone Donut x2", price = 24000.0)
+                    } else {
+                        CartManager.items.forEachIndexed { index, cartItem ->
+                            if (index > 0) Spacer(modifier = Modifier.height(10.dp))
+                            EditableCartItem(
+                                cartItem = cartItem,
+                                onAdd = { CartManager.addItem(cartItem.menuItem) },
+                                onRemove = { CartManager.removeItem(cartItem.menuItem) },
+                                onDeleteAll = { CartManager.deleteItem(cartItem.menuItem) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Ringkasan Biaya
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SectionHeader(
+                        icon = Icons.Default.Receipt,
+                        title = "Ringkasan Biaya",
+                        subtitle = "Rincian pembayaran pesanan Anda"
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OrderSummaryItem(name = "Subtotal", price = subtotal)
+
+                    if (orderType == "Delivery") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OrderSummaryItem(name = "Ongkos Kirim (${String.format("%.1f km", distanceKm)})", price = deliveryFee)
+                    }
+
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f), thickness = 1.dp, modifier = Modifier.padding(vertical = 14.dp))
+
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .heightIn(max = 150.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color.LightGray)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(LightOrangeJco)
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        LazyColumn(modifier = Modifier.padding(8.dp)) {
-                            items(searchSuggestions) { result ->
-                                Text(
-                                    text = result.displayName,
-                                    fontSize = 11.sp,
-                                    color = DarkCharcoal,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            addressInput = result.displayName
-                                            userLocation = LatLng(result.latitude, result.longitude)
-                                            searchSuggestions = emptyList()
-                                            searchQuery = ""
-                                        }
-                                        .padding(vertical = 8.dp, horizontal = 4.dp)
-                                )
-                                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-                            }
-                        }
+                        Text("Total Pembayaran", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkCharcoal)
+                        Text("Rp ${String.format("%,.0f", totalPayment)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OrangeJco)
                     }
                 }
+            }
 
-                // Scan GPS Button
-                Button(
-                    onClick = {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
-                        )
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "GPS", tint = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Gunakan Lokasi GPS Saat Ini", color = Color.White, fontSize = 12.sp)
-                }
-                
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-                ) {
-                    GoogleMapView(
-                        center = userLocation,
-                        markers = listOf(
-                            cafeLocation to "Dapoer Lavana",
-                            userLocation to "Tujuan Pengiriman Anda"
-                        ),
-                        onMapClick = { p ->
-                            userLocation = p
-                            coroutineScope.launch {
-                                val street = com.lavana.dapoer.data.GeocodingHelper.reverseGeocode(p.latitude, p.longitude)
-                                if (street.isNotBlank()) {
-                                    addressInput = street
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                // Info Jarak & Ongkir
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(LightOrangeJco, RoundedCornerShape(8.dp))
-                            .border(1.dp, OrangeJco.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(12.dp)
-                    ) {
-                        Column {
-                            Text("Jarak Antar", fontSize = 10.sp, color = DarkCharcoal)
-                            Text(String.format("%.1f km", distanceKm), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OrangeJco)
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(LightOrangeJco, RoundedCornerShape(8.dp))
-                            .border(1.dp, OrangeJco.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(12.dp)
-                    ) {
-                        Column {
-                            Text("Ongkos Kirim", fontSize = 10.sp, color = DarkCharcoal)
-                            Text("Rp ${String.format("%,.0f", deliveryFee)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OrangeJco)
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                if (orderType == "Dine In") {
-                    Text("Nomor Meja", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = tableNumberInput,
-                        onValueChange = { tableNumberInput = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = OrangeJco,
-                            unfocusedBorderColor = Color.LightGray
-                        )
-                    )
-                } else {
-                    Text("Alamat Lengkap", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = addressInput,
-                        onValueChange = { addressInput = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = OrangeJco,
-                            unfocusedBorderColor = Color.LightGray
-                        )
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(20.dp))
-            
-            // Rincian Pesanan
-            Text("Rincian Pesanan", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            if (CartManager.items.isEmpty()) {
-                Text("Keranjang Anda kosong. Menggunakan item demo.", fontSize = 12.sp, color = DarkCharcoal.copy(alpha = 0.5f))
-                OrderSummaryItem(name = "Alcapone Donut x2", price = 24000.0)
-            } else {
-                CartManager.items.forEach { cartItem ->
-                    EditableCartItem(
-                        cartItem = cartItem,
-                        onAdd = { CartManager.addItem(cartItem.menuItem) },
-                        onRemove = { CartManager.removeItem(cartItem.menuItem) },
-                        onDeleteAll = { CartManager.deleteItem(cartItem.menuItem) }
-                    )
-                }
-            }
-            
-            if (orderType == "Delivery") {
-                OrderSummaryItem(name = "Ongkos Kirim (${String.format("%.1f km", distanceKm)})", price = deliveryFee)
-            }
-            
-            HorizontalDivider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.padding(vertical = 12.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Total Pembayaran", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkCharcoal)
-                Text("Rp ${String.format("%,.0f", totalPayment)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OrangeJco)
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
             if (errorPlaceOrder != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = errorPlaceOrder!!,
-                    color = Color.Red,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
- 
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Tombol "Pesan Sekarang" (Modern J.CO style)
-            Button(
-                onClick = {
-                    isPlacingOrder = true
-                    errorPlaceOrder = null
-                    coroutineScope.launch {
-                        try {
-                            val currentUserId = SupabaseClient.currentUserId
- 
-                            val newOrder = Order(
-                                userId = currentUserId,
-                                orderType = orderType,
-                                status = "Pending",
-                                tableNumber = if (orderType == "Dine In") tableNumberInput else null,
-                                deliveryAddress = if (orderType == "Delivery") addressInput else null,
-                                deliveryDistanceKm = if (orderType == "Delivery") distanceKm else null,
-                                deliveryFee = if (orderType == "Delivery") deliveryFee else 0.0,
-                                subtotal = subtotal,
-                                total = totalPayment,
-                                paymentMethod = "Belum Memilih",
-                                paymentStatus = "Belum Bayar",
-                                coordinates = if (orderType == "Delivery") "${userLocation.latitude},${userLocation.longitude}" else null,
-                                notes = "Dipesan via Android App"
-                            )
-                            
-                            // 1. Kirim order ke Supabase
-                            val insertedOrder = SupabaseClient.db["orders"].insert(newOrder) {
-                                select()
-                            }.decodeSingle<Order>()
-                            
-                            val orderId = insertedOrder.id!!
-                            
-                            // 2. Kirim order items ke Supabase jika cart berisi
-                            val itemsToInsert = if (CartManager.items.isNotEmpty()) {
-                                CartManager.items.map { cartItem ->
-                                    OrderItem(
-                                        orderId = orderId,
-                                        menuItemId = cartItem.menuItem.id,
-                                        quantity = cartItem.quantity,
-                                        priceAtOrder = cartItem.menuItem.price
-                                    )
-                                }
-                            } else {
-                                emptyList()
-                            }
-                            
-                            if (itemsToInsert.isNotEmpty()) {
-                                SupabaseClient.db["order_items"].insert(itemsToInsert)
-                            }
-                            
-                            // 3. Bersihkan keranjang
-                            CartManager.clearCart()
-                            Toast.makeText(context, "Pesanan berhasil dibuat!", Toast.LENGTH_LONG).show()
-                            
-                            // 4. Pindah ke Halaman Lacak
-                            onOrderPlaced(orderId)
-                        } catch (e: Exception) {
-                            errorPlaceOrder = "Gagal memproses pesanan: ${e.localizedMessage}"
-                            Toast.makeText(context, "Gagal memproses pesanan: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                        } finally {
-                            isPlacingOrder = false
-                        }
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = RedPromo.copy(alpha = 0.1f)),
+                    border = BorderStroke(1.dp, RedPromo.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = RedPromo,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = errorPlaceOrder!!,
+                            color = RedPromo,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
-                },
-                enabled = !isPlacingOrder,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(55.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangeJco)
-            ) {
-                Text(
-                    text = if (isPlacingOrder) "Memproses Pesanan..." else "Pesan Sekarang",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String? = null
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(LightOrangeJco),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(22.dp))
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = DarkCharcoal,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif
+            )
+            if (subtitle != null) {
+                Text(subtitle, fontSize = 12.sp, color = DarkCharcoal.copy(alpha = 0.55f))
             }
         }
     }
@@ -616,12 +879,10 @@ fun EditableCartItem(
     onDeleteAll: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
-        shape = RoundedCornerShape(8.dp)
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = LightGrayJco),
+        border = BorderStroke(1.dp, LightOrangeJco.copy(alpha = 0.6f)),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Row(
             modifier = Modifier
@@ -634,28 +895,29 @@ fun EditableCartItem(
                     model = cartItem.menuItem.imageUrl,
                     contentDescription = cartItem.menuItem.name,
                     modifier = Modifier
-                        .size(50.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(12.dp)),
                     contentScale = ContentScale.Crop
                 )
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
             }
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = cartItem.menuItem.name,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     color = DarkCharcoal
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Rp ${String.format("%,.0f", cartItem.menuItem.price)}",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = OrangeJco,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Bold
                 )
-                
-                Spacer(modifier = Modifier.height(6.dp))
+
+                Spacer(modifier = Modifier.height(8.dp))
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -683,30 +945,30 @@ fun EditableCartItem(
                     
                     Row(
                         modifier = Modifier
-                            .height(26.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(LightOrangeJco)
-                            .border(1.dp, OrangeJco, RoundedCornerShape(6.dp)),
+                            .height(30.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White)
+                            .border(1.dp, OrangeJco, RoundedCornerShape(8.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
                             onClick = onRemove,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(30.dp)
                         ) {
-                            Text("-", fontWeight = FontWeight.Bold, color = OrangeJco, fontSize = 12.sp)
+                            Text("-", fontWeight = FontWeight.Bold, color = OrangeJco, fontSize = 14.sp)
                         }
                         Text(
                             text = cartItem.quantity.toString(),
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = OrangeJco,
-                            modifier = Modifier.padding(horizontal = 6.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp)
                         )
                         IconButton(
                             onClick = onAdd,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(30.dp)
                         ) {
-                            Text("+", fontWeight = FontWeight.Bold, color = OrangeJco, fontSize = 12.sp)
+                            Text("+", fontWeight = FontWeight.Bold, color = OrangeJco, fontSize = 14.sp)
                         }
                     }
                 }

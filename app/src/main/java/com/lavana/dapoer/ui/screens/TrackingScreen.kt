@@ -26,6 +26,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TwoWheeler
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -132,7 +138,7 @@ fun TrackingScreen(
 
     LaunchedEffect(orderId) {
         loadOrder()
-        
+
         // Setup listener realtime
         try {
             val channel = SupabaseClient.realtime.channel("order_track_$orderId")
@@ -140,7 +146,7 @@ fun TrackingScreen(
                 table = "orders"
                 filter = "id=eq.$orderId"
             }
-            
+
             coroutineScope.launch {
                 changeFlow.collectLatest { change ->
                     when (change) {
@@ -158,11 +164,32 @@ fun TrackingScreen(
                     }
                 }
             }
-            
+
+            // Hubungkan realtime DULU, baru subscribe ke channel.
             SupabaseClient.realtime.connect()
             channel.subscribe()
         } catch (e: Exception) {
             // websocket error fallback
+            e.printStackTrace()
+        }
+    }
+
+    // Polling fallback: setiap 3 detik ambil ulang baris order agar lokasi
+    // driver (notes) ikut diperbarui meski realtime gagal/terlambat.
+    // Coroutine ini otomatis dibatalkan saat composable keluar.
+    LaunchedEffect(orderId) {
+        while (true) {
+            kotlinx.coroutines.delay(3000)
+            try {
+                val fresh = SupabaseClient.db["orders"].select {
+                    filter { eq("id", orderId) }
+                }.decodeList<Order>().firstOrNull()
+                if (fresh != null) {
+                    order = fresh
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -251,53 +278,78 @@ fun TrackingScreen(
         ) {
             
             // Header Info Pesanan
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(12.dp))
-                    .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-                    .padding(16.dp)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    // Gradient top strip with order number + type
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                            .padding(horizontal = 16.dp, vertical = 16.dp)
                     ) {
-                        Text("Pesanan #${order?.orderNumber ?: "..."}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkCharcoal)
-                        Text(
-                            text = orderType,
-                            color = OrangeJco,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Status: ${order?.status ?: "Pending"}", fontSize = 12.sp, color = DarkCharcoal.copy(alpha = 0.8f))
-                    Text(
-                        text = when (order?.status) {
-                            "Pending" -> "Menunggu konfirmasi admin."
-                            "Diproses" -> "Sedang disiapkan di Dapur."
-                            "Siap" -> "Pesanan siap! Silakan diambil/ditunggu."
-                            "Diantar" -> {
-                                val name = driverAccount?.name
-                                if (name != null) "Sedang dalam pengiriman oleh $name." else "Sedang dalam pengiriman."
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Pesanan", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                                Text("#${order?.orderNumber ?: "..."}", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.White)
                             }
-                            "Selesai" -> "Selesai! Terima kasih atas pesanan Anda."
-                            else -> "Memuat..."
-                        },
-                        fontSize = 12.sp,
-                        color = DarkCharcoal.copy(alpha = 0.8f)
-                    )
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color.White.copy(alpha = 0.2f))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = orderType,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
 
-                    // Lihat Resi Button
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray)
-                    Button(
-                        onClick = { showReceiptDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = LightOrangeJco),
-                        modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(1.dp, OrangeJco)
-                    ) {
-                        Text("Lihat Resi / Struk", color = OrangeJco, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Status: ${order?.status ?: "Pending"}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = DarkCharcoal)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = when (order?.status) {
+                                "Pending" -> "Menunggu konfirmasi admin."
+                                "Diproses" -> "Sedang disiapkan di Dapur."
+                                "Siap" -> "Pesanan siap! Silakan diambil/ditunggu."
+                                "Diantar" -> {
+                                    val name = driverAccount?.name
+                                    if (name != null) "Sedang dalam pengiriman oleh $name." else "Sedang dalam pengiriman."
+                                }
+                                "Selesai" -> "Selesai! Terima kasih atas pesanan Anda."
+                                else -> "Memuat..."
+                            },
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+
+                        // Lihat Resi Button
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = Color.LightGray.copy(alpha = 0.4f))
+                        OutlinedButton(
+                            onClick = { showReceiptDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
+                            border = BorderStroke(1.5.dp, OrangeJco),
+                            modifier = Modifier.fillMaxWidth().height(46.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Lihat Resi / Struk", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
             }
@@ -307,8 +359,9 @@ fun TrackingScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(1.dp, OrangeJco),
-                    shape = RoundedCornerShape(12.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, OrangeJco.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -341,19 +394,20 @@ fun TrackingScreen(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .background(if (isSelected) LightOrangeJco else Color.White, RoundedCornerShape(8.dp))
-                                        .border(1.dp, if (isSelected) OrangeJco else Color.LightGray, RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(50))
+                                        .background(if (isSelected) OrangeJco else Color.White)
+                                        .border(1.dp, if (isSelected) OrangeJco else LightOrangeJco, RoundedCornerShape(50))
                                         .clickable {
                                             selectedPayment = method
                                         }
-                                        .padding(vertical = 10.dp),
+                                        .padding(vertical = 12.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = method,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = if (isSelected) OrangeJco else DarkCharcoal
+                                        color = if (isSelected) Color.White else DarkCharcoal
                                     )
                                 }
                             }
@@ -458,14 +512,29 @@ fun TrackingScreen(
                                             inputStream?.close()
                                             if (bytes != null) {
                                                 val fileName = uploadedFileName ?: "bukti_bayar_${orderId}.jpg"
-                                                val bucket = SupabaseClient.storage.from("menu-images")
+                                                val bucket = SupabaseClient.storage["menu-images"]
+
+                                                // Hapus bukti lama jika ada agar storage tidak menumpuk file yatim.
+                                                try {
+                                                    val oldUrl = order?.paymentReceiptUrl
+                                                    val bucketPath = "/storage/v1/object/public/menu-images/"
+                                                    if (oldUrl != null && oldUrl.contains(bucketPath)) {
+                                                        val oldFile = oldUrl.substringAfter(bucketPath).substringBefore("?")
+                                                        if (oldFile.isNotBlank() && oldFile != "qris_barcode.png") {
+                                                            bucket.delete(oldFile)
+                                                        }
+                                                    }
+                                                } catch (e: Exception) {
+                                                    e.printStackTrace()
+                                                }
+
                                                 bucket.upload(fileName, bytes)
-                                                publicUrl = "${SupabaseClient.SUPABASE_URL}/storage/v1/object/public/menu-images/$fileName"
+                                                publicUrl = bucket.publicUrl(fileName)
                                             }
                                         } catch (e: Exception) {
                                             e.printStackTrace()
                                         }
-                                        
+
                                         SupabaseClient.db["orders"].update({
                                             set("payment_status", "Menunggu Verifikasi")
                                             set("payment_method", selectedPayment)
@@ -482,13 +551,13 @@ fun TrackingScreen(
                                 }
                             },
                             enabled = !isUploadingPayment,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = OrangeJco)
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
                         ) {
                             Text(
                                 text = if (isUploadingPayment) "Mengirim..." else "Konfirmasi Pembayaran",
-                                color = Color.White,
+                                color = OnAccentDark,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -499,14 +568,23 @@ fun TrackingScreen(
             Spacer(modifier = Modifier.height(20.dp))
             
             // Linimasa Progress Status Pesanan (Diterima -> Disiapkan -> Diantar -> Selesai)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(12.dp))
-                    .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-                    .padding(16.dp)
+            Text(
+                text = "Status Pesanan",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = DarkCharcoal,
+                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     TrackingStepItem(stepNumber = 1, title = "Pesanan Diterima", time = "10:15 WIB", isActive = activeStep >= 1)
                     TrackingStepItem(stepNumber = 2, title = "Sedang Disiapkan di Dapur", time = "10:25 WIB", isActive = activeStep >= 2)
                     TrackingStepItem(stepNumber = 3, title = "Sedang Dalam Pengiriman", time = "10:40 WIB", isActive = activeStep >= 3)
@@ -518,79 +596,121 @@ fun TrackingScreen(
             
             // JIKA DELIVERY: Tampilkan Info Driver & Peta Live Lokasi Driver
             if (orderType == "Delivery") {
-                Text(
-                    text = "Posisi Live Kurir",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = DarkCharcoal,
-                    modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
-                )
-                
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-                ) {
-                    GoogleMapView(
-                        center = driverLocation,
-                        markers = listOf(
-                            driverLocation to "${driverAccount?.name ?: "Kurir"} (Dalam Perjalanan)",
-                            customerHome to "Rumah Anda"
-                        ),
-                        modifier = Modifier.fillMaxSize()
+                Column(modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)) {
+                    Text(
+                        text = "Posisi Live Kurir",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = DarkCharcoal
+                    )
+                    Text(
+                        text = "Pantau lokasi kurir secara langsung",
+                        fontSize = 12.sp,
+                        color = Color.Gray
                     )
                 }
-                
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                    ) {
+                        GoogleMapView(
+                            center = driverLocation,
+                            markers = listOf(
+                                driverLocation to "${driverAccount?.name ?: "Kurir"} (Dalam Perjalanan)",
+                                customerHome to "Rumah Anda"
+                            ),
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Info Profil Kurir J.CO
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(LightOrangeJco, RoundedCornerShape(12.dp))
-                        .border(1.dp, OrangeJco.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                        .padding(16.dp)
+                // Info Profil Kurir
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     if (driverAccount != null) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Avatar Driver
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(52.dp)
                                     .clip(CircleShape)
-                                    .background(LightOrangeJco)
-                                    .border(1.dp, OrangeJco, CircleShape),
+                                    .background(LightOrangeJco),
                                 contentAlignment = Alignment.Center
                             ) {
                                 val initial = driverAccount?.name?.firstOrNull()?.toString() ?: "D"
-                                Text(initial, fontWeight = FontWeight.Bold, color = OrangeJco, fontSize = 20.sp)
+                                Text(initial, fontWeight = FontWeight.Bold, color = OrangeJco, fontSize = 22.sp)
                             }
-                            
-                            Spacer(modifier = Modifier.width(16.dp))
-                            
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(driverAccount?.name ?: "Driver Cafe Andro", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 16.sp)
-                                Text("Status: Sedang mengantar pesanan Anda", fontSize = 11.sp, color = DarkCharcoal.copy(alpha = 0.8f))
-                                Text("Rating Kurir: 4.9 ★", fontSize = 11.sp, color = DarkCharcoal.copy(alpha = 0.8f))
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.TwoWheeler, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Sedang mengantar pesanan Anda", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(LightOrangeJco)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Star, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("4.9", fontWeight = FontWeight.Bold, color = ForestGreen, fontSize = 12.sp)
                             }
                         }
                     } else {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Menunggu Driver mengambil pesanan...",
-                                color = OrangeJco,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                textAlign = TextAlign.Center
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(LightOrangeJco),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = OrangeJco, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Mencari kurir",
+                                    color = DarkCharcoal,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                                Text(
+                                    text = "Menunggu Driver mengambil pesanan...",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -598,15 +718,17 @@ fun TrackingScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Tombol "Kembali Ke Beranda" (Modern J.CO style)
+            // Tombol "Kembali Ke Beranda"
             Button(
                 onClick = onNavigateHome,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(25.dp),
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = OrangeJco)
             ) {
+                Icon(Icons.Default.Home, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Kembali ke Beranda",
                     color = Color.White,
@@ -650,48 +772,58 @@ fun TrackingStepItem(
     isActive: Boolean,
     isLast: Boolean = false
 ) {
-    val indicatorColor = if (isActive) LightOrangeJco else Color.White
-    val lineCol = if (isActive) OrangeJco else Color.LightGray
+    val lineCol = if (isActive) OrangeJco else Color.LightGray.copy(alpha = 0.5f)
     val textCol = if (isActive) DarkCharcoal else Color.Gray
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.width(36.dp)
         ) {
-            // Circle Step Number
+            // Circle Step Indicator: filled teal when active/completed
             Box(
                 modifier = Modifier
                     .size(28.dp)
-                    .background(indicatorColor, CircleShape)
+                    .clip(CircleShape)
+                    .background(if (isActive) OrangeJco else LightOrangeJco)
                     .border(1.dp, if (isActive) OrangeJco else Color.LightGray, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = stepNumber.toString(),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isActive) OrangeJco else Color.Gray
-                )
+                if (isActive) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                } else {
+                    Text(
+                        text = stepNumber.toString(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OrangeJco.copy(alpha = 0.6f)
+                    )
+                }
             }
-            
+
             // Vertical connector line
             if (!isLast) {
                 Box(
                     modifier = Modifier
-                        .width(2.dp)
-                        .height(24.dp)
+                        .width(3.dp)
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(2.dp))
                         .background(lineCol)
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.width(16.dp))
-        
-        Column {
+
+        Column(modifier = Modifier.padding(top = 2.dp)) {
             Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = textCol)
             Text(time, fontSize = 11.sp, color = textCol.copy(alpha = 0.7f))
         }

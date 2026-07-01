@@ -21,10 +21,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -38,6 +41,8 @@ import com.lavana.dapoer.ui.theme.*
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -79,36 +84,13 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(LightGrayJco)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-            // Top Navigation Back Button
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {
-                    if (isRegisterScreen) {
-                        isRegisterScreen = false
-                        errorMessage = null
-                    } else {
-                        onNavigateBack()
-                    }
-                }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = DarkCharcoal
-                    )
-                }
-            }
-
             val infiniteTransition = rememberInfiniteTransition(label = "LogoAnim")
             val scale by infiniteTransition.animateFloat(
                 initialValue = 0.95f,
@@ -129,69 +111,129 @@ fun LoginScreen(
                 label = "LogoRotate"
             )
 
-            if (!isRegisterScreen) {
-                // ==================== LOGIN SCREEN ====================
+            // ==================== TEAL GRADIENT TOP REGION (shared) ====================
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                    .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+            ) {
+                // Back button overlaid on the gradient (soft translucent chip for contrast)
+                IconButton(
+                    onClick = {
+                        if (isRegisterScreen) {
+                            isRegisterScreen = false
+                            errorMessage = null
+                        } else {
+                            onNavigateBack()
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 12.dp, top = 12.dp)
+                        .size(40.dp)
+                        .background(Color.White.copy(alpha = 0.15f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White
+                    )
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
+                        .padding(top = 36.dp, bottom = 40.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    
                     Box(
                         modifier = Modifier
-                            .size(240.dp)
+                            .size(190.dp)
                             .graphicsLayer(scaleX = scale, scaleY = scale),
                         contentAlignment = Alignment.Center
                     ) {
                         // Minimalist decorative spinning ring
                         Box(
                             modifier = Modifier
-                                .size(220.dp)
-                                .border(BorderStroke(1.5.dp, OrangeJco.copy(alpha = 0.25f)), shape = CircleShape)
+                                .size(176.dp)
+                                .border(BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)), shape = CircleShape)
                                 .graphicsLayer(rotationZ = rotation)
                         ) {
-                            // Small decorative orange dot on the ring
+                            // Small decorative dot on the ring
                             Box(
                                 modifier = Modifier
                                     .size(8.dp)
-                                    .background(OrangeJco, CircleShape)
+                                    .background(OrangeAccent, CircleShape)
                                     .align(Alignment.TopCenter)
                             )
                         }
-                        
-                        // Dapoer Lavana Logo (Enlarged inside the ring)
+
+                        // Dapoer Lavana Logo (white on gradient)
                         Image(
                             painter = painterResource(id = R.drawable.logo_lavana),
                             contentDescription = "Logo Dapoer Lavana",
                             modifier = Modifier
-                                .height(150.dp)
-                                .fillMaxWidth(0.85f),
+                                .height(120.dp)
+                                .fillMaxWidth(0.78f),
                             contentScale = ContentScale.Fit,
-                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(OrangeJco)
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
                         )
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Dapoer Lavana",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Serif,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isRegisterScreen) "Daftar untuk mulai memesan" else "Masuk untuk melanjutkan",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+            }
 
+            if (!isRegisterScreen) {
+                // ==================== LOGIN SCREEN ====================
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = (-24).dp)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                  Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 22.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     // Welcome Header text
                     Text(
                         text = "Selamat Datang!",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Serif,
                         color = DarkCharcoal,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Start
                     )
                     Text(
                         text = "Masuk ke akun Anda untuk melanjutkan",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = Color.Gray,
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                         textAlign = TextAlign.Start
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     // Email/Username/Phone Input
                     OutlinedTextField(
@@ -238,16 +280,26 @@ fun LoginScreen(
                     )
 
                     if (errorMessage != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = errorMessage!!,
-                            color = Color.Red,
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center
-                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(RedPromo.copy(alpha = 0.10f))
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = errorMessage!!,
+                                color = RedPromo,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     // Button Masuk
                     Button(
@@ -263,6 +315,24 @@ fun LoginScreen(
                                 val inputClean = if (rawInput.contains("@")) rawInput else "$rawInput@lavana.com"
                                 var loginSuccess = false
                                 
+                                val saveSession = { userId: String, emailVal: String, roleVal: String, staff: StaffAccount? ->
+                                    val editor = sharedPref.edit()
+                                        .putString("logged_in_user_id", userId)
+                                        .putString("logged_in_user_email", emailVal)
+                                        .putString("logged_in_user_role", roleVal)
+                                    if (staff != null) {
+                                        try {
+                                            val jsonStr = Json.encodeToString(staff)
+                                            editor.putString("logged_in_staff_json", jsonStr)
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
+                                    } else {
+                                        editor.remove("logged_in_staff_json")
+                                    }
+                                    editor.apply()
+                                }
+
                                 try {
                                     // 1. Check if user is staff (Admin or Driver)
                                     try {
@@ -277,6 +347,7 @@ fun LoginScreen(
                                             val staff = staffAccounts.first()
                                             CartManager.currentStaff = staff
                                             SupabaseClient.setMockUser(staff.id ?: "staff_id", staff.username)
+                                            saveSession(staff.id ?: "staff_id", staff.username, staff.role, staff)
                                             loginSuccess = true
                                             
                                             if (staff.role == "Admin") {
@@ -297,6 +368,9 @@ fun LoginScreen(
                                                 this.password = password
                                             }
                                             CartManager.currentStaff = null
+                                            val currentAuthUser = SupabaseClient.auth.currentUserOrNull()
+                                            val uId = currentAuthUser?.id ?: java.util.UUID.randomUUID().toString()
+                                            saveSession(uId, inputClean, "Customer", null)
                                             loginSuccess = true
                                             onNavigateToCustomer()
                                         } catch (authException: Exception) {
@@ -309,8 +383,10 @@ fun LoginScreen(
                                         val registeredUsers = sharedPref.getStringSet("registered_users", emptySet()) ?: emptySet()
                                         val match = registeredUsers.firstOrNull { it.startsWith("$inputClean:") }
                                         if (match != null && match.substringAfter(":") == password) {
-                                            SupabaseClient.setMockUser(java.util.UUID.randomUUID().toString(), inputClean)
+                                            val uId = java.util.UUID.randomUUID().toString()
+                                            SupabaseClient.setMockUser(uId, inputClean)
                                             CartManager.currentStaff = null
+                                            saveSession(uId, inputClean, "Customer", null)
                                             loginSuccess = true
                                             onNavigateToCustomer()
                                         }
@@ -319,8 +395,10 @@ fun LoginScreen(
                                     // 3. Local Mock Backups (Offline fallback)
                                     if (!loginSuccess) {
                                         if (inputClean == "pelanggan@lavana.com" && password == "pelanggan123") {
-                                            SupabaseClient.setMockUser("7838c359-d924-468b-b5c4-398925c3194c", "pelanggan@lavana.com")
+                                            val uId = "7838c359-d924-468b-b5c4-398925c3194c"
+                                            SupabaseClient.setMockUser(uId, "pelanggan@lavana.com")
                                             CartManager.currentStaff = null
+                                            saveSession(uId, "pelanggan@lavana.com", "Customer", null)
                                             loginSuccess = true
                                             onNavigateToCustomer()
                                         } else if (inputClean == "admin@lavana.com" && password == "admin123") {
@@ -333,6 +411,7 @@ fun LoginScreen(
                                             )
                                             CartManager.currentStaff = mockAdmin
                                             SupabaseClient.setMockUser(mockAdmin.id, mockAdmin.username)
+                                            saveSession(mockAdmin.id ?: "", mockAdmin.username, "Admin", mockAdmin)
                                             loginSuccess = true
                                             onNavigateToAdmin()
                                         } else if (inputClean == "driver@lavana.com" && password == "driver123") {
@@ -345,6 +424,7 @@ fun LoginScreen(
                                             )
                                             CartManager.currentStaff = mockDriver
                                             SupabaseClient.setMockUser(mockDriver.id, mockDriver.username)
+                                            saveSession(mockDriver.id ?: "", mockDriver.username, "Driver", mockDriver)
                                             loginSuccess = true
                                             onNavigateToDriver()
                                         }
@@ -362,25 +442,45 @@ fun LoginScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                         enabled = !isLoading
                     ) {
-                        Text(
-                            text = if (isLoading) "Memproses..." else "Masuk",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = OnAccentDark,
+                                strokeWidth = 2.5.dp,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Memproses...",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OnAccentDark
+                            )
+                        } else {
+                            Text(
+                                text = "Masuk",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OnAccentDark
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    HorizontalDivider(color = LightOrangeJco, thickness = 1.dp)
+
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Bottom register prompt
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(text = "Belum punya akun ? ", fontSize = 13.sp, color = DarkCharcoal)
                         Text(
@@ -394,66 +494,44 @@ fun LoginScreen(
                             }
                         )
                     }
+                  }
                 }
             } else {
                 // ==================== REGISTER/SIGNUP SCREEN ====================
-                Column(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
+                        .offset(y = (-24).dp)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                  Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 22.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    
-                    Box(
-                        modifier = Modifier
-                            .size(180.dp)
-                            .graphicsLayer(scaleX = scale, scaleY = scale),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(160.dp)
-                                .border(BorderStroke(1.5.dp, OrangeJco.copy(alpha = 0.25f)), shape = CircleShape)
-                                .graphicsLayer(rotationZ = rotation)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(OrangeJco, CircleShape)
-                                    .align(Alignment.TopCenter)
-                            )
-                        }
-                        
-                        Image(
-                            painter = painterResource(id = R.drawable.logo_lavana),
-                            contentDescription = "Logo Dapoer Lavana",
-                            modifier = Modifier
-                                .height(110.dp)
-                                .fillMaxWidth(0.75f),
-                            contentScale = ContentScale.Fit,
-                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(OrangeJco)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-
                     Text(
                         text = "Buat Akun",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Serif,
                         color = DarkCharcoal,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Start
                     )
                     Text(
                         text = "Silahkan lengkapi data diri kamu untuk menyelesaikan proses registrasi akun",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = Color.Gray,
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                         textAlign = TextAlign.Start
                     )
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(22.dp))
 
                     // Nomor Telepon Input
                     OutlinedTextField(
@@ -471,7 +549,7 @@ fun LoginScreen(
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Nama Lengkap Input
                     OutlinedTextField(
@@ -489,7 +567,7 @@ fun LoginScreen(
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Email Input (Opsional)
                     OutlinedTextField(
@@ -507,7 +585,7 @@ fun LoginScreen(
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Kata Sandi Input
                     OutlinedTextField(
@@ -535,7 +613,7 @@ fun LoginScreen(
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Konfirmasi Password Input
                     OutlinedTextField(
@@ -564,16 +642,26 @@ fun LoginScreen(
                     )
 
                     if (errorMessage != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = errorMessage!!,
-                            color = Color.Red,
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center
-                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(RedPromo.copy(alpha = 0.10f))
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = errorMessage!!,
+                                color = RedPromo,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(22.dp))
 
                     // Button Buat Akun
                     Button(
@@ -644,20 +732,59 @@ fun LoginScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                         enabled = !isLoading
                     ) {
-                        Text(
-                            text = if (isLoading) "Memproses..." else "Buat Akun",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = OnAccentDark,
+                                strokeWidth = 2.5.dp,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Memproses...",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OnAccentDark
+                            )
+                        } else {
+                            Text(
+                                text = "Buat Akun",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OnAccentDark
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
+
+                    HorizontalDivider(color = LightOrangeJco, thickness = 1.dp)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Bottom login prompt
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "Sudah punya akun ? ", fontSize = 13.sp, color = DarkCharcoal)
+                        Text(
+                            text = "Masuk",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = OrangeJco,
+                            modifier = Modifier.clickable {
+                                isRegisterScreen = false
+                                errorMessage = null
+                            }
+                        )
+                    }
+                  }
                 }
             }
         }

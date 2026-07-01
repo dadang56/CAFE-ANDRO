@@ -13,8 +13,8 @@ android {
         applicationId = "com.lavana.dapoer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "5.0"
+        versionCode = 12
+        versionName = "10.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -65,9 +65,11 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     
-    // OpenStreetMap (OSM)
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
-    
+    // Google Maps
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.maps.android:maps-compose:4.4.1")
+    implementation("com.google.android.gms:play-services-location:21.2.0")
+
     // Supabase & Ktor (engine required by Supabase)
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.2.3")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.2.3")

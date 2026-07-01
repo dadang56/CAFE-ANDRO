@@ -20,7 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -156,6 +158,34 @@ fun AdminScreen(
 }
 
 // ==========================================================
+// SHARED: MODERN EMPTY STATE
+// ==========================================================
+@Composable
+fun AdminEmptyState(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 48.dp, bottom = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(LightOrangeJco),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(48.dp))
+        }
+        Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkCharcoal)
+        Text(subtitle, fontSize = 13.sp, color = Color.Gray, textAlign = TextAlign.Center)
+    }
+}
+
+// ==========================================================
 // TABS 0: ORDERS MANAGEMENT
 // ==========================================================
 @Composable
@@ -217,54 +247,88 @@ fun TabAdminOrders() {
         refreshData()
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Kelola Pesanan Delivery", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
-            IconButton(onClick = { refreshData() }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = OrangeJco)
-            }
-        }
-
+    Column(modifier = Modifier.fillMaxSize()) {
         // Sales Summary Card
         val totalSales = ordersList.filter { it.status == "Selesai" }.sumOf { it.total }
         val completedCount = ordersList.filter { it.status == "Selesai" }.size
-        
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+
+        // Floating teal gradient header with summary
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("Total Penjualan", fontSize = 12.sp, color = Color.Gray)
-                    Text("Rp ${String.format("%,.0f", totalSales)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = OrangeJco)
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            "Kelola Pesanan Delivery",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontFamily = FontFamily.Serif
+                        )
+                        Text("Pantau pesanan masuk hari ini", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                    }
+                    IconButton(
+                        onClick = { refreshData() },
+                        modifier = Modifier.background(Color.White.copy(alpha = 0.18f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White)
+                    }
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Pesanan Sukses", fontSize = 12.sp, color = Color.Gray)
-                    Text("$completedCount Pesanan", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Total Penjualan", fontSize = 12.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("Rp ${String.format("%,.0f", totalSales)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = OrangeJco)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Pesanan Sukses", fontSize = 12.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("$completedCount Pesanan", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
+                        }
+                    }
                 }
             }
         }
 
         if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = OrangeJco)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(color = OrangeJco)
+                    Text("Memuat pesanan...", fontSize = 13.sp, color = Color.Gray)
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (ordersList.isEmpty()) {
                     item {
-                        Text("Belum ada pesanan masuk.", modifier = Modifier.fillMaxWidth().padding(top = 40.dp), textAlign = TextAlign.Center, color = Color.Gray)
+                        AdminEmptyState(
+                            icon = Icons.Default.ReceiptLong,
+                            title = "Belum ada pesanan",
+                            subtitle = "Belum ada pesanan masuk."
+                        )
                     }
                 } else {
                     items(ordersList) { order ->
@@ -313,7 +377,9 @@ fun TabAdminOrders() {
     if (showAssignDialog && selectedOrderForDriver != null) {
         AlertDialog(
             onDismissRequest = { showAssignDialog = false },
-            title = { Text("Tugaskan Driver Pengiriman", fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Tugaskan Driver Pengiriman", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Pilih Driver yang bersedia untuk mengantar pesanan #${selectedOrderForDriver?.orderNumber}:", fontSize = 13.sp)
@@ -342,17 +408,23 @@ fun TabAdminOrders() {
                                             } catch (e: Exception) {}
                                         }
                                     },
+                                shape = RoundedCornerShape(14.dp),
                                 colors = CardDefaults.cardColors(containerColor = LightOrangeJco),
                                 border = BorderStroke(1.dp, OrangeJco.copy(alpha = 0.3f))
                             ) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.DeliveryDining, contentDescription = "Driver", tint = OrangeJco)
+                                    Box(
+                                        modifier = Modifier.size(40.dp).clip(CircleShape).background(Color.White),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.DeliveryDining, contentDescription = "Driver", tint = OrangeJco)
+                                    }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text(driver.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(driver.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal)
                                         Text("Telp: ${driver.contactNumber ?: "-"}", fontSize = 11.sp, color = Color.Gray)
                                     }
                                 }
@@ -375,7 +447,9 @@ fun TabAdminOrders() {
         
         AlertDialog(
             onDismissRequest = { previewReceiptUrl = null },
-            title = { Text("Bukti Pembayaran Pelanggan", fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Bukti Pembayaran Pelanggan", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
             text = {
                 Box(
                     modifier = Modifier.fillMaxWidth().height(320.dp).background(Color.White, RoundedCornerShape(8.dp)).border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)),
@@ -442,13 +516,15 @@ fun TabAdminOrders() {
         val context = LocalContext.current
         AlertDialog(
             onDismissRequest = { selectedOrderForPrint = null },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
             title = {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Cetak Struk Thermal", fontWeight = FontWeight.Bold)
+                    Text("Cetak Struk Thermal", fontWeight = FontWeight.Bold, color = DarkCharcoal)
                     if (isFetchingPrintItems) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                     }
@@ -638,8 +714,25 @@ fun TabAdminOrders() {
                     }
                     Button(
                         onClick = {
-                            android.widget.Toast.makeText(context, "Resi dikirim ke Printer Bluetooth Thermal...", android.widget.Toast.LENGTH_LONG).show()
-                            selectedOrderForPrint = null
+                            val savedPrinter = PrinterManager.getSavedPrinter(context)
+                            if (savedPrinter == null) {
+                                android.widget.Toast.makeText(context, "Pilih printer dulu di Pengaturan Printer", android.widget.Toast.LENGTH_LONG).show()
+                            } else {
+                                val order = selectedOrderForPrint
+                                val receiptText = buildOrderReceiptText(order, printOrderItems, printMenuItemsMap)
+                                coroutineScope.launch {
+                                    val result = PrinterManager.printText(context, receiptText)
+                                    result.fold(
+                                        onSuccess = {
+                                            android.widget.Toast.makeText(context, "Struk terkirim ke printer", android.widget.Toast.LENGTH_LONG).show()
+                                        },
+                                        onFailure = { ex ->
+                                            android.widget.Toast.makeText(context, ex.message ?: "Gagal mencetak struk", android.widget.Toast.LENGTH_LONG).show()
+                                        }
+                                    )
+                                }
+                                selectedOrderForPrint = null
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
                     ) {
@@ -671,10 +764,11 @@ fun AdminOrderCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -766,22 +860,22 @@ fun AdminOrderCard(
                             }
                             Button(
                                 onClick = onAccept,
-                                colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.height(36.dp)
                             ) {
-                                Text("Konfirmasi Pembayaran", fontSize = 12.sp, color = Color.White)
+                                Text("Konfirmasi Pembayaran", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                     "Diproses" -> {
                         Button(
                             onClick = onAssignDriverClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.height(36.dp)
                         ) {
-                            Text("Tugaskan Driver", fontSize = 12.sp, color = Color.White)
+                            Text("Tugaskan Driver", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold)
                         }
                     }
                     else -> {}
@@ -793,7 +887,9 @@ fun AdminOrderCard(
     if (showRejectDialog) {
         AlertDialog(
             onDismissRequest = { showRejectDialog = false },
-            title = { Text("Tolak Pembayaran", fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Tolak Pembayaran", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
             text = {
                 Column {
                     Text("Masukkan alasan penolakan pembayaran:")
@@ -833,15 +929,19 @@ fun AdminOrderCard(
 // ==========================================================
 @Composable
 fun TabAdminMenu() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var menuList by remember { mutableStateOf<List<MenuItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
     var showManageCategoriesDialog by remember { mutableStateOf(false) }
     var selectedMenuForEdit by remember { mutableStateOf<MenuItem?>(null) }
+    var menuToDelete by remember { mutableStateOf<MenuItem?>(null) }
 
-    fun loadMenu() {
-        isLoading = true
+    fun loadMenu(showLoadingSpinner: Boolean = false) {
+        if (showLoadingSpinner) {
+            isLoading = true
+        }
         coroutineScope.launch {
             menuList = SupabaseClient.initializeMenuIfEmpty()
             isLoading = false
@@ -849,73 +949,96 @@ fun TabAdminMenu() {
     }
 
     LaunchedEffect(Unit) {
-        loadMenu()
+        loadMenu(showLoadingSpinner = true)
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            Text(
-                text = "Kelola Menu", 
-                fontSize = 20.sp, 
-                fontWeight = FontWeight.Bold, 
-                color = ForestGreen,
-                modifier = Modifier.weight(1f)
-            )
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
-                    onClick = { showManageCategoriesDialog = true },
-                    border = BorderStroke(1.dp, OrangeJco),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Icon(Icons.Default.Settings, contentDescription = "Kategori", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Kategori", fontSize = 12.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Kelola Menu",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontFamily = FontFamily.Serif
+                    )
+                    Text("Atur katalog & ketersediaan produk", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { showAddDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Tambah", tint = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Menu", color = Color.White, fontSize = 12.sp)
+                    OutlinedButton(
+                        onClick = { showManageCategoriesDialog = true },
+                        border = BorderStroke(1.dp, Color.White),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = "Kategori", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Kategori", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { showAddDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Tambah", tint = OnAccentDark, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Menu", color = OnAccentDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
         if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = OrangeJco)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(color = OrangeJco)
+                    Text("Memuat menu...", fontSize = 13.sp, color = Color.Gray)
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (menuList.isEmpty()) {
+                    item {
+                        AdminEmptyState(
+                            icon = Icons.Default.RestaurantMenu,
+                            title = "Belum ada menu",
+                            subtitle = "Tekan tombol Menu untuk menambahkan produk pertama."
+                        )
+                    }
+                }
                 items(menuList) { item ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
-                                modifier = Modifier.size(50.dp).clip(RoundedCornerShape(8.dp)).background(LightOrangeJco)
+                                modifier = Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)).background(LightOrangeJco)
                             ) {
                                 if (item.imageUrl.isNotBlank()) {
                                     AsyncImage(
@@ -957,13 +1080,22 @@ fun TabAdminMenu() {
                             Switch(
                                 checked = item.isAvailable,
                                 onCheckedChange = { isChecked ->
+                                    menuList = menuList.map {
+                                        if (it.id == item.id) it.copy(isAvailable = isChecked) else it
+                                    }
                                     coroutineScope.launch {
                                         try {
                                             SupabaseClient.db["menu_items"].update({
                                                 set("is_available", isChecked)
                                             }) { filter { eq("id", item.id) } }
-                                            loadMenu()
-                                        } catch (e: Exception) {}
+                                            loadMenu(showLoadingSpinner = false)
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                            menuList = menuList.map {
+                                                if (it.id == item.id) it.copy(isAvailable = !isChecked) else it
+                                            }
+                                            android.widget.Toast.makeText(context, "Gagal mengubah stok: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                        }
                                     }
                                 },
                                 colors = SwitchDefaults.colors(
@@ -978,14 +1110,7 @@ fun TabAdminMenu() {
                                 Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.Gray)
                             }
                             IconButton(onClick = {
-                                coroutineScope.launch {
-                                    try {
-                                        SupabaseClient.db["menu_items"].delete {
-                                            filter { eq("id", item.id) }
-                                        }
-                                        loadMenu()
-                                    } catch (e: Exception) {}
-                                }
+                                menuToDelete = item
                             }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color.Red)
                             }
@@ -1001,7 +1126,7 @@ fun TabAdminMenu() {
         AddOrEditMenuDialog(
             item = null,
             onDismiss = { showAddDialog = false },
-            onSave = { name, category, price, desc, imageUrl ->
+            onSave = { name, category, price, desc, imageUrl, isAvailable ->
                 coroutineScope.launch {
                     try {
                         val newItem = MenuItem(
@@ -1011,12 +1136,15 @@ fun TabAdminMenu() {
                             price = price,
                             description = desc,
                             imageUrl = imageUrl,
-                            isAvailable = true
+                            isAvailable = isAvailable
                         )
                         SupabaseClient.db["menu_items"].insert(newItem)
                         showAddDialog = false
-                        loadMenu()
-                    } catch (e: Exception) {}
+                        loadMenu(showLoadingSpinner = false)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        android.widget.Toast.makeText(context, "Gagal menambahkan menu: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         )
@@ -1027,7 +1155,7 @@ fun TabAdminMenu() {
         AddOrEditMenuDialog(
             item = selectedMenuForEdit,
             onDismiss = { selectedMenuForEdit = null },
-            onSave = { name, category, price, desc, imageUrl ->
+            onSave = { name, category, price, desc, imageUrl, isAvailable ->
                 coroutineScope.launch {
                     try {
                         SupabaseClient.db["menu_items"].update({
@@ -1036,12 +1164,16 @@ fun TabAdminMenu() {
                             set("price", price)
                             set("description", desc)
                             set("image_url", imageUrl)
+                            set("is_available", isAvailable)
                         }) {
                             filter { eq("id", selectedMenuForEdit?.id ?: "") }
                         }
                         selectedMenuForEdit = null
-                        loadMenu()
-                    } catch (e: Exception) {}
+                        loadMenu(showLoadingSpinner = false)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        android.widget.Toast.makeText(context, "Gagal mengubah menu: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         )
@@ -1053,24 +1185,72 @@ fun TabAdminMenu() {
             onCategoriesUpdated = { loadMenu() }
         )
     }
+
+    // Konfirmasi Hapus Menu
+    if (menuToDelete != null) {
+        val itemToDelete = menuToDelete!!
+        AlertDialog(
+            onDismissRequest = { menuToDelete = null },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Hapus Menu", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = { Text("Hapus menu ini? Tindakan tidak dapat dibatalkan.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        menuToDelete = null
+                        coroutineScope.launch {
+                            try {
+                                // Hapus gambar dari bucket bila berasal dari "menu-images"
+                                if (itemToDelete.imageUrl.contains("menu-images")) {
+                                    try {
+                                        val fileName = itemToDelete.imageUrl.substringAfterLast('/')
+                                        SupabaseClient.storage["menu-images"].delete(listOf(fileName))
+                                    } catch (ex: Exception) {
+                                        ex.printStackTrace()
+                                    }
+                                }
+                                SupabaseClient.db["menu_items"].delete {
+                                    filter { eq("id", itemToDelete.id) }
+                                }
+                                loadMenu(showLoadingSpinner = false)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                android.widget.Toast.makeText(context, "Gagal menghapus menu: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Hapus", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { menuToDelete = null }) {
+                    Text("Batal", color = Color.Gray)
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun AddOrEditMenuDialog(
     item: MenuItem?,
     onDismiss: () -> Unit,
-    onSave: (String, String, Double, String, String) -> Unit
+    onSave: (String, String, Double, String, String, Boolean) -> Unit
 ) {
     var name by remember { mutableStateOf(item?.name ?: "") }
     var category by remember { mutableStateOf(item?.category ?: "Donuts") }
     var price by remember { mutableStateOf(item?.price?.toInt()?.toString() ?: "") }
-    
+
     val parsedOriginalPrice = item?.getOriginalPrice()
     var originalPriceInput by remember { mutableStateOf(parsedOriginalPrice?.toInt()?.toString() ?: "") }
     val cleanDesc = item?.getCleanDescription() ?: ""
     var desc by remember { mutableStateOf(cleanDesc) }
-    
+
     var imageUrl by remember { mutableStateOf(item?.imageUrl ?: "") }
+    var isAvailable by remember { mutableStateOf(item?.isAvailable ?: true) }
 
     val context = LocalContext.current
     val dialogScope = rememberCoroutineScope()
@@ -1088,10 +1268,26 @@ fun AddOrEditMenuDialog(
                         val fileName = "${UUID.randomUUID()}.jpg"
                         val bucket = SupabaseClient.storage["menu-images"]
                         bucket.upload(fileName, bytes, upsert = true)
-                        imageUrl = bucket.publicUrl(fileName)
+                        val newUrl = bucket.publicUrl(fileName)
+                        // Hapus gambar yang sedang ditampilkan (state hidup), bukan original yang
+                        // ditangkap sekali — sehingga cleanup mengikuti foto di layar walau admin
+                        // mengganti foto beberapa kali sebelum menyimpan (tidak ada file orphan).
+                        val previousUrl = imageUrl
+                        if (previousUrl.isNotBlank() && previousUrl.contains("menu-images") && previousUrl != newUrl) {
+                            try {
+                                val oldFileName = previousUrl.substringAfter("menu-images/").substringBefore('?')
+                                bucket.delete(listOf(oldFileName))
+                            } catch (ex: Exception) {
+                                ex.printStackTrace()
+                            }
+                        }
+                        imageUrl = newUrl
                     }
                 } catch (e: Exception) {
-                    // Fail / error log
+                    e.printStackTrace()
+                    dialogScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Gagal mengunggah foto menu: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 } finally {
                     isUploadingPhoto = false
                 }
@@ -1101,7 +1297,9 @@ fun AddOrEditMenuDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (item == null) "Tambah Item Baru" else "Edit Detail Item", fontWeight = FontWeight.Bold) },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color.White,
+        title = { Text(if (item == null) "Tambah Item Baru" else "Edit Detail Item", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -1134,17 +1332,22 @@ fun AddOrEditMenuDialog(
                         val isCatSelected = category == cat
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isCatSelected) OrangeJco else LightGrayJco)
+                                .clip(RoundedCornerShape(50))
+                                .background(if (isCatSelected) OrangeJco else Color.White)
+                                .border(
+                                    1.dp,
+                                    if (isCatSelected) OrangeJco else LightOrangeJco,
+                                    RoundedCornerShape(50)
+                                )
                                 .clickable { category = cat }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = cat,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isCatSelected) Color.White else DarkCharcoal
+                                color = if (isCatSelected) Color.White else OrangeJco
                             )
                         }
                     }
@@ -1199,6 +1402,22 @@ fun AddOrEditMenuDialog(
                         }
                     }
                 }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Tersedia", fontSize = 14.sp, color = DarkCharcoal)
+                    Switch(
+                        checked = isAvailable,
+                        onCheckedChange = { isAvailable = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = ForestGreen,
+                            checkedTrackColor = ForestGreen.copy(alpha = 0.5f)
+                        )
+                    )
+                }
             }
         },
         confirmButton = {
@@ -1207,11 +1426,12 @@ fun AddOrEditMenuDialog(
                     val priceVal = price.toDoubleOrNull() ?: 0.0
                     val originalPriceVal = originalPriceInput.toDoubleOrNull()
                     val finalDesc = createDescriptionWithOriginalPrice(desc, originalPriceVal)
-                    onSave(name, category, priceVal, finalDesc, imageUrl)
+                    onSave(name, category, priceVal, finalDesc, imageUrl, isAvailable)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = OrangeJco)
+                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Text("Simpan", color = Color.White)
+                Text("Simpan", color = OnAccentDark, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -1247,10 +1467,24 @@ fun TabAdminBanners() {
                         val fileName = "banners/${UUID.randomUUID()}.jpg"
                         val bucket = SupabaseClient.storage["menu-images"]
                         bucket.upload(fileName, bytes, upsert = true)
-                        imageUrlInput = bucket.publicUrl(fileName)
+                        val newUrl = bucket.publicUrl(fileName)
+                        // Hapus gambar lama dari bucket setelah upload baru berhasil
+                        val previousUrl = imageUrlInput
+                        if (previousUrl.isNotBlank() && previousUrl.contains("menu-images") && previousUrl != newUrl) {
+                            try {
+                                val oldFileName = previousUrl.substringAfter("menu-images/").substringBefore('?')
+                                bucket.delete(listOf(oldFileName))
+                            } catch (ex: Exception) {
+                                ex.printStackTrace()
+                            }
+                        }
+                        imageUrlInput = newUrl
                     }
                 } catch (e: Exception) {
-                    // Fail / error log
+                    e.printStackTrace()
+                    coroutineScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Gagal mengunggah gambar banner: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 } finally {
                     isUploadingPhoto = false
                 }
@@ -1275,18 +1509,37 @@ fun TabAdminBanners() {
         loadBanners()
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Kelola Banner Promo Carousel", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
-        Spacer(modifier = Modifier.height(12.dp))
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+        ) {
+            Column {
+                Text(
+                    "Kelola Banner Promo",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontFamily = FontFamily.Serif
+                )
+                Text("Atur banner carousel di beranda pelanggan", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+            }
+        }
+
+        Column(modifier = Modifier.weight(1f).padding(16.dp)) {
 
         // Form Tambah Banner
         Card(
             modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Tambah Banner Baru", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Tambah Banner Baru", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkCharcoal)
                 OutlinedTextField(
                     value = titleInput,
                     onValueChange = { titleInput = it },
@@ -1299,8 +1552,8 @@ fun TabAdminBanners() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(120.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)),
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, LightOrangeJco, RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         AsyncImage(
@@ -1322,8 +1575,8 @@ fun TabAdminBanners() {
                 } else {
                     OutlinedButton(
                         onClick = { photoPickerLauncher.launch("image/*") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
                         border = BorderStroke(1.dp, OrangeJco),
                         enabled = !isUploadingPhoto
@@ -1358,39 +1611,69 @@ fun TabAdminBanners() {
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
                 ) {
-                    Text("Tambahkan Banner", color = Color.White)
+                    Text("Tambahkan Banner", color = OnAccentDark, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+        Text("Daftar Banner Aktif", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkCharcoal)
+        Spacer(modifier = Modifier.height(12.dp))
 
         if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = OrangeJco)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(color = OrangeJco)
+                    Text("Memuat banner...", fontSize = 13.sp, color = Color.Gray)
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (banners.isEmpty()) {
+                    item {
+                        AdminEmptyState(
+                            icon = Icons.Default.Bookmark,
+                            title = "Belum ada banner",
+                            subtitle = "Tambahkan banner promo untuk tampil di beranda."
+                        )
+                    }
+                }
                 items(banners) { banner ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            Box(
+                                modifier = Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)).background(LightOrangeJco)
+                            ) {
+                                if (banner.imageUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = banner.imageUrl,
+                                        contentDescription = banner.title,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(Icons.Default.Bookmark, contentDescription = null, tint = OrangeJco, modifier = Modifier.align(Alignment.Center))
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(banner.title ?: "Promo Spesial", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(banner.title ?: "Promo Spesial", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal)
                                 Text(banner.imageUrl, fontSize = 10.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             IconButton(onClick = {
@@ -1409,6 +1692,7 @@ fun TabAdminBanners() {
                     }
                 }
             }
+        }
         }
     }
 }
@@ -1508,28 +1792,55 @@ fun TabAdminReports() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Floating teal gradient header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            Text("Laporan Keuangan", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
-            IconButton(onClick = { loadReportData() }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = OrangeJco)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Laporan Keuangan",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontFamily = FontFamily.Serif
+                    )
+                    Text("Rekap omset & transaksi selesai", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                }
+                IconButton(
+                    onClick = { loadReportData() },
+                    modifier = Modifier.background(Color.White.copy(alpha = 0.18f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White)
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp)) {
 
         Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color.White).border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(LightOrangeJco)
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             listOf("Harian", "Bulanan").forEach { type ->
                 val selected = reportType == type
                 Box(
                     modifier = Modifier
                         .weight(1f)
+                        .clip(RoundedCornerShape(11.dp))
                         .clickable { reportType = type }
                         .background(if (selected) OrangeJco else Color.Transparent)
                         .padding(vertical = 10.dp),
@@ -1537,7 +1848,7 @@ fun TabAdminReports() {
                 ) {
                     Text(
                         text = "Laporan $type",
-                        color = if (selected) Color.White else Color.Gray,
+                        color = if (selected) Color.White else OrangeJco,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
@@ -1551,9 +1862,9 @@ fun TabAdminReports() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(Color.White)
-                .border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                .border(1.dp, LightOrangeJco, RoundedCornerShape(12.dp))
                 .clickable {
                     val calendar = java.util.Calendar.getInstance()
                     val currentVal = if (reportType == "Harian") selectedDate else "$selectedMonth-01"
@@ -1593,28 +1904,35 @@ fun TabAdminReports() {
 
         if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = OrangeJco)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(color = OrangeJco)
+                    Text("Memuat laporan...", fontSize = 13.sp, color = Color.Gray)
+                }
             }
         } else {
             Column(modifier = Modifier.weight(1f)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Card(
                         modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text("Total Omset", fontSize = 11.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text("Rp ${String.format("%,.0f", totalRevenue)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
                         }
                     }
                     Card(
                         modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text("Total Transaksi", fontSize = 11.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text("$totalOrdersCount Order", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = OrangeJco)
                         }
                     }
@@ -1624,10 +1942,11 @@ fun TabAdminReports() {
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Metode Pembayaran", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkCharcoal)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1671,19 +1990,22 @@ fun TabAdminReports() {
                 ) {
                     if (filteredOrders.isEmpty()) {
                         item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                Text("Tidak ada transaksi untuk periode ini.", color = Color.Gray, fontSize = 12.sp)
-                            }
+                            AdminEmptyState(
+                                icon = Icons.Default.Assessment,
+                                title = "Belum ada transaksi",
+                                subtitle = "Tidak ada transaksi untuk periode ini."
+                            )
                         }
                     } else {
                         items(filteredOrders) { order ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(18.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                                border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -1702,13 +2024,16 @@ fun TabAdminReports() {
                 }
             }
         }
+        }
     }
 
     if (showPrintPreview) {
         val toastContext = LocalContext.current
         AlertDialog(
             onDismissRequest = { showPrintPreview = false },
-            title = { Text("Preview Cetak Laporan", fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Preview Cetak Laporan", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
             text = {
                 Column(
                     modifier = Modifier
@@ -1738,16 +2063,13 @@ fun TabAdminReports() {
                     ) {
                         OutlinedButton(
                             onClick = {
-                                val filename = if (reportType == "Harian") {
-                                    "Laporan_Harian_$selectedDate.txt"
+                                val reportLines = reportText.split("\n")
+                                val file = PdfHelper.generateTextPdf(context, "Laporan-Penjualan", reportLines)
+                                if (file != null) {
+                                    PdfHelper.sharePdf(context, file)
+                                    android.widget.Toast.makeText(context, "PDF laporan dibuat", android.widget.Toast.LENGTH_LONG).show()
                                 } else {
-                                    "Laporan_Bulanan_$selectedMonth.txt"
-                                }
-                                val ok = saveReportToDownloads(context, filename, reportText)
-                                if (ok) {
-                                    android.widget.Toast.makeText(context, "Laporan disimpan ke folder Downloads: $filename", android.widget.Toast.LENGTH_LONG).show()
-                                } else {
-                                    android.widget.Toast.makeText(context, "Gagal menyimpan laporan.", android.widget.Toast.LENGTH_LONG).show()
+                                    android.widget.Toast.makeText(context, "Gagal membuat PDF laporan.", android.widget.Toast.LENGTH_LONG).show()
                                 }
                             },
                             border = BorderStroke(1.dp, OrangeJco),
@@ -1755,21 +2077,30 @@ fun TabAdminReports() {
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Icon(Icons.Default.Save, contentDescription = "Simpan", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Save, contentDescription = "Simpan PDF", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Simpan ke File", fontSize = 12.sp)
+                            Text("Unduh PDF", fontSize = 12.sp)
                         }
 
                         Button(
                             onClick = {
-                                val filename = if (reportType == "Harian") {
-                                    "Laporan_Harian_$selectedDate.txt"
+                                val savedPrinter = PrinterManager.getSavedPrinter(context)
+                                if (savedPrinter == null) {
+                                    android.widget.Toast.makeText(context, "Pilih printer dulu di Pengaturan Printer", android.widget.Toast.LENGTH_LONG).show()
                                 } else {
-                                    "Laporan_Bulanan_$selectedMonth.txt"
+                                    coroutineScope.launch {
+                                        val result = PrinterManager.printText(context, reportText)
+                                        result.fold(
+                                            onSuccess = {
+                                                android.widget.Toast.makeText(context, "Laporan terkirim ke printer", android.widget.Toast.LENGTH_LONG).show()
+                                            },
+                                            onFailure = { ex ->
+                                                android.widget.Toast.makeText(context, ex.message ?: "Gagal mencetak laporan", android.widget.Toast.LENGTH_LONG).show()
+                                            }
+                                        )
+                                    }
+                                    showPrintPreview = false
                                 }
-                                saveReportToDownloads(context, filename, reportText)
-                                android.widget.Toast.makeText(context, "Laporan disimpan & dikirim ke Printer...", android.widget.Toast.LENGTH_LONG).show()
-                                showPrintPreview = false
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
                             modifier = Modifier.weight(1f),
@@ -1777,7 +2108,7 @@ fun TabAdminReports() {
                         ) {
                             Icon(Icons.Default.Print, contentDescription = "Cetak", tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Cetak Laporan", color = Color.White, fontSize = 12.sp)
+                            Text("Cetak Thermal", color = Color.White, fontSize = 12.sp)
                         }
                     }
                     TextButton(
@@ -1831,6 +2162,8 @@ fun TabAdminProfile(onLogout: () -> Unit) {
 
     var isSimulating by remember { mutableStateOf(false) }
     var simulationStep by remember { mutableStateOf<String?>(null) }
+
+    var showPrinterSettings by remember { mutableStateOf(false) }
 
     fun loadStaff() {
         isStaffLoading = true
@@ -2151,9 +2484,9 @@ fun TabAdminProfile(onLogout: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.4f))
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Pengaturan Delivery & Toko", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = ForestGreen)
@@ -2332,10 +2665,23 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                                         val bucket = SupabaseClient.storage["menu-images"]
                                         bucket.upload(fileName, bytes)
                                         val publicUrl = bucket.publicUrl(fileName)
+                                        // Hapus QRIS lama dari bucket setelah upload baru berhasil
+                                        val previousQris = qrisUrl
+                                        if (previousQris.isNotBlank() && previousQris.contains("menu-images") && previousQris != publicUrl) {
+                                            try {
+                                                val oldFileName = previousQris.substringAfter("menu-images/").substringBefore('?')
+                                                bucket.delete(listOf(oldFileName))
+                                            } catch (ex: Exception) {
+                                                ex.printStackTrace()
+                                            }
+                                        }
                                         qrisUrl = publicUrl
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
+                                    coroutineScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                        android.widget.Toast.makeText(context, "Gagal mengunggah foto QRIS: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                    }
                                 } finally {
                                     isQrisUploading = false
                                 }
@@ -2452,17 +2798,20 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                                     
                                 } catch (e: Exception) {
                                     e.printStackTrace()
+                                    coroutineScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                        android.widget.Toast.makeText(context, "Gagal menyimpan pengaturan: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                    }
                                 } finally {
                                     isSavingSettings = false
                                 }
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(45.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
                         enabled = !isSavingSettings
                     ) {
-                        Text(if (isSavingSettings) "Menyimpan..." else "Simpan Pengaturan", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(if (isSavingSettings) "Menyimpan..." else "Simpan Pengaturan", color = OnAccentDark, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -2473,8 +2822,9 @@ fun TabAdminProfile(onLogout: () -> Unit) {
         // Form Pendaftaran Akun Karyawan / Driver
         Card(
             modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Daftarkan Akun Driver / Admin Baru", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ForestGreen)
@@ -2575,12 +2925,12 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(45.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                     enabled = !isRegisteringStaff
                 ) {
-                    Text(if (isRegisteringStaff) "Mendaftarkan..." else "Daftarkan Akun Karyawan", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(if (isRegisteringStaff) "Mendaftarkan..." else "Daftarkan Akun Karyawan", color = OnAccentDark, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -2590,8 +2940,9 @@ fun TabAdminProfile(onLogout: () -> Unit) {
         // List Karyawan Terdaftar
         Card(
             modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Daftar Karyawan Terdaftar", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkCharcoal)
@@ -2644,14 +2995,49 @@ fun TabAdminProfile(onLogout: () -> Unit) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Pengaturan Printer Thermal
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showPrinterSettings = true }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Print, contentDescription = "Pengaturan Printer", tint = OrangeJco)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("Pengaturan Printer", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal)
+                        Text("Pilih printer Bluetooth thermal", fontSize = 11.sp, color = Color.Gray)
+                    }
+                }
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         Button(
             onClick = onLogout,
             colors = ButtonDefaults.buttonColors(containerColor = RedPromo),
-            shape = RoundedCornerShape(25.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp)
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp)
         ) {
+            Icon(Icons.Default.Logout, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text("Keluar dari Aplikasi", fontWeight = FontWeight.Bold, color = Color.White)
         }
+    }
+
+    if (showPrinterSettings) {
+        PrinterSettingsDialog(onDismiss = { showPrinterSettings = false })
     }
 }
 
@@ -2660,6 +3046,7 @@ fun ManageCategoriesDialog(
     onDismiss: () -> Unit,
     onCategoriesUpdated: () -> Unit
 ) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
     var selectedCategoryToRename by remember { mutableStateOf<String?>(null) }
@@ -2668,8 +3055,10 @@ fun ManageCategoriesDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color.White,
         title = {
-            Text("Kelola Kategori Produk", fontWeight = FontWeight.Bold)
+            Text("Kelola Kategori Produk", fontWeight = FontWeight.Bold, color = DarkCharcoal)
         },
         text = {
             if (isSaving) {
@@ -2707,19 +3096,39 @@ fun ManageCategoriesDialog(
                         Button(
                             onClick = {
                                 val trimmed = newCategoryInput.trim()
-                                if (trimmed.isNotEmpty()) {
+                                if (trimmed.isEmpty() || trimmed.contains('|')) {
+                                    android.widget.Toast.makeText(context, "Nama kategori tidak boleh kosong atau mengandung karakter |", android.widget.Toast.LENGTH_LONG).show()
+                                } else {
                                     val exists = DYNAMIC_CATEGORIES.any { it.equals(trimmed, ignoreCase = true) }
                                     if (!exists) {
-                                        CUSTOM_CATEGORIES.add(trimmed)
-                                        newCategoryInput = ""
-                                        onCategoriesUpdated()
+                                        isSaving = true
+                                        coroutineScope.launch {
+                                            try {
+                                                SupabaseClient.db["banners"].insert(BannerItem(
+                                                    title = "category|$trimmed",
+                                                    imageUrl = ""
+                                                ))
+                                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                    CUSTOM_CATEGORIES.add(trimmed)
+                                                }
+                                                newCategoryInput = ""
+                                                onCategoriesUpdated()
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                                android.widget.Toast.makeText(context, "Gagal menambah kategori: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                            } finally {
+                                                isSaving = false
+                                            }
+                                        }
+                                    } else {
+                                        android.widget.Toast.makeText(context, "Kategori sudah ada!", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Tambah", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Tambah", color = OnAccentDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
@@ -2731,26 +3140,66 @@ fun ManageCategoriesDialog(
                             items(DYNAMIC_CATEGORIES) { cat ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = LightGrayJco)
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = LightGrayJco),
+                                    border = BorderStroke(1.dp, LightOrangeJco)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(cat, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                        IconButton(
-                                            onClick = {
-                                                selectedCategoryToRename = cat
-                                                renameInput = cat
+                                        Text(cat, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = DarkCharcoal)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton(
+                                                onClick = {
+                                                    selectedCategoryToRename = cat
+                                                    renameInput = cat
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Edit,
+                                                    contentDescription = "Rename",
+                                                    tint = OrangeJco,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
                                             }
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Edit,
-                                                contentDescription = "Rename",
-                                                tint = OrangeJco,
-                                                modifier = Modifier.size(20.dp)
-                                            )
+                                            IconButton(
+                                                onClick = {
+                                                    isSaving = true
+                                                    coroutineScope.launch {
+                                                        try {
+                                                            val count = SupabaseClient.db["menu_items"].select {
+                                                                filter { eq("category", cat) }
+                                                            }.decodeList<MenuItem>().size
+                                                            
+                                                            if (count > 0) {
+                                                                 android.widget.Toast.makeText(context, "Tidak bisa menghapus: masih ada $count produk di kategori ini!", android.widget.Toast.LENGTH_LONG).show()
+                                                            } else {
+                                                                 SupabaseClient.db["banners"].delete {
+                                                                     filter { eq("title", "category|$cat") }
+                                                                 }
+                                                                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                                     CUSTOM_CATEGORIES.remove(cat)
+                                                                 }
+                                                                 onCategoriesUpdated()
+                                                            }
+                                                        } catch (e: Exception) {
+                                                             e.printStackTrace()
+                                                             android.widget.Toast.makeText(context, "Gagal menghapus kategori: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                                        } finally {
+                                                             isSaving = false
+                                                        }
+                                                    }
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Hapus",
+                                                    tint = Color.Red,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -2770,7 +3219,9 @@ fun ManageCategoriesDialog(
     if (selectedCategoryToRename != null) {
         AlertDialog(
             onDismissRequest = { selectedCategoryToRename = null },
-            title = { Text("Ubah Nama Kategori", fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Ubah Nama Kategori", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
             text = {
                 Column {
                     Text("Mengubah nama kategori \"$selectedCategoryToRename\" menjadi:", fontSize = 13.sp)
@@ -2789,7 +3240,13 @@ fun ManageCategoriesDialog(
                     onClick = {
                         val oldName = selectedCategoryToRename!!
                         val newName = renameInput.trim()
-                        if (newName.isNotEmpty() && oldName != newName) {
+                        if (newName.isEmpty() || newName.contains('|')) {
+                            android.widget.Toast.makeText(context, "Nama kategori tidak boleh kosong atau mengandung karakter |", android.widget.Toast.LENGTH_LONG).show()
+                        } else if (!newName.equals(oldName, ignoreCase = true) && DYNAMIC_CATEGORIES.any { it.equals(newName, ignoreCase = true) }) {
+                            // Cegah rename ke nama yang sudah ada — kalau diteruskan, semua produk
+                            // kategori lama akan tergabung diam-diam ke kategori tujuan (tak bisa dibatalkan).
+                            android.widget.Toast.makeText(context, "Kategori sudah ada!", android.widget.Toast.LENGTH_SHORT).show()
+                        } else if (oldName != newName) {
                             isSaving = true
                             selectedCategoryToRename = null
                             coroutineScope.launch {
@@ -2799,17 +3256,33 @@ fun ManageCategoriesDialog(
                                     }) {
                                         filter { eq("category", oldName) }
                                     }
-                                    val idx = DYNAMIC_CATEGORIES.indexOf(oldName)
-                                    if (idx != -1) {
-                                        DYNAMIC_CATEGORIES[idx] = newName
+                                    try {
+                                        val oldBanner = SupabaseClient.db["banners"].select {
+                                            filter { eq("title", "category|$oldName") }
+                                        }.decodeList<BannerItem>().firstOrNull()
+                                        if (oldBanner != null) {
+                                            SupabaseClient.db["banners"].update({
+                                                set("title", "category|$newName")
+                                            }) { filter { eq("id", oldBanner.id ?: "") } }
+                                        }
+                                    } catch (ex: Exception) {
+                                        ex.printStackTrace()
                                     }
-                                    val customIdx = CUSTOM_CATEGORIES.indexOf(oldName)
-                                    if (customIdx != -1) {
-                                        CUSTOM_CATEGORIES[customIdx] = newName
+                                    // Optimistic in-memory update on Main thread so rename persists in UI
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        val idx = DYNAMIC_CATEGORIES.indexOf(oldName)
+                                        if (idx != -1) {
+                                            DYNAMIC_CATEGORIES[idx] = newName
+                                        }
+                                        val customIdx = CUSTOM_CATEGORIES.indexOf(oldName)
+                                        if (customIdx != -1) {
+                                            CUSTOM_CATEGORIES[customIdx] = newName
+                                        }
                                     }
                                     onCategoriesUpdated()
                                 } catch (e: Exception) {
                                     e.printStackTrace()
+                                    android.widget.Toast.makeText(context, "Gagal mengubah nama kategori: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
                                 } finally {
                                     isSaving = false
                                 }
@@ -2818,10 +3291,10 @@ fun ManageCategoriesDialog(
                             selectedCategoryToRename = null
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Simpan", color = Color.White)
+                    Text("Simpan", color = OnAccentDark, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -2830,6 +3303,67 @@ fun ManageCategoriesDialog(
                 }
             }
         )
+    }
+}
+
+// ==========================================================
+// THERMAL RECEIPT BUILDER (58mm / 32 char width)
+// ==========================================================
+private const val RECEIPT_WIDTH = 32
+
+private fun receiptLineLR(left: String, right: String): String {
+    val space = RECEIPT_WIDTH - left.length - right.length
+    return if (space > 0) {
+        left + " ".repeat(space) + right
+    } else {
+        // Tidak muat dalam satu baris, pisah baris
+        left + "\n" + right.padStart(RECEIPT_WIDTH)
+    }
+}
+
+private fun receiptCenter(text: String): String {
+    if (text.length >= RECEIPT_WIDTH) return text
+    val pad = (RECEIPT_WIDTH - text.length) / 2
+    return " ".repeat(pad) + text
+}
+
+fun buildOrderReceiptText(
+    order: Order?,
+    items: List<OrderItem>,
+    menuMap: Map<String, MenuItem>
+): String {
+    if (order == null) return ""
+    val divider = "-".repeat(RECEIPT_WIDTH)
+    return buildString {
+        appendLine(receiptCenter("DAPOER LAVANA"))
+        appendLine(receiptCenter("Kopi & Selera Nusantara"))
+        appendLine(divider)
+        appendLine("No. Order : #${order.orderNumber}")
+        appendLine("Tanggal   : ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}")
+        appendLine("Tipe      : ${order.orderType}")
+        if (!order.customerPhone.isNullOrBlank()) {
+            appendLine("Telp      : ${order.customerPhone}")
+        }
+        appendLine(divider)
+        items.forEach { item ->
+            val menuName = menuMap[item.menuItemId]?.name ?: "Item Menu"
+            val priceStr = "Rp ${String.format("%,.0f", item.priceAtOrder * item.quantity)}"
+            appendLine(receiptLineLR("$menuName x${item.quantity}", priceStr))
+            if (!item.notes.isNullOrBlank()) {
+                appendLine("  * Notes: ${item.notes}")
+            }
+        }
+        appendLine(divider)
+        appendLine(receiptLineLR("Subtotal", "Rp ${String.format("%,.0f", order.subtotal)}"))
+        if (order.deliveryFee > 0.0) {
+            appendLine(receiptLineLR("Ongkir", "Rp ${String.format("%,.0f", order.deliveryFee)}"))
+        }
+        appendLine(receiptLineLR("TOTAL", "Rp ${String.format("%,.0f", order.total)}"))
+        appendLine(divider)
+        appendLine("Metode: ${order.paymentMethod} (${order.paymentStatus})")
+        appendLine()
+        appendLine(receiptCenter("Terima Kasih Atas"))
+        appendLine(receiptCenter("Kunjungan Anda"))
     }
 }
 

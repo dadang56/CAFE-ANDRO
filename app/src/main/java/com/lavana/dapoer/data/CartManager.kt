@@ -44,23 +44,27 @@ object CartManager {
                     val currentLat = startLat + (destLat - startLat) * fraction
                     val currentLon = startLon + (destLon - startLon) * fraction
                     val currentLoc = LatLng(currentLat, currentLon)
-                    
-                    if (orderId.startsWith("sim_")) {
-                        simulatedDriverLocations[orderId] = currentLoc
-                    } else {
+
+                    // Selalu perbarui peta lokasi di memori (jalur instan satu perangkat),
+                    // baik untuk order simulasi maupun order DB nyata.
+                    simulatedDriverLocations[orderId] = currentLoc
+
+                    // Untuk order nyata (non sim_), tetap tulis lokasi ke notes DB
+                    // agar tracking lintas perangkat tetap berjalan.
+                    if (!orderId.startsWith("sim_")) {
                         try {
                             val freshOrder = SupabaseClient.db["orders"].select {
                                 filter { eq("id", orderId) }
                             }.decodeSingle<Order>()
                             val updatedNotes = appendDriverLocation(freshOrder.notes, currentLoc)
-                            
+
                             SupabaseClient.db["orders"].update({
                                 set("notes", updatedNotes)
                             }) {
                                 filter { eq("id", orderId) }
                             }
                         } catch (e: Exception) {
-                            // ignore DB error
+                            e.printStackTrace()
                         }
                     }
                     delay(3000)
@@ -74,6 +78,8 @@ object CartManager {
     }
     
     fun stopDriverSimulation(orderId: String) {
+        // Hentikan simulasi tetapi JANGAN hapus lokasi terakhir dari peta,
+        // agar pin kurir tetap berhenti di titik tujuan (destination).
         activeSimulations.remove(orderId)
     }
 

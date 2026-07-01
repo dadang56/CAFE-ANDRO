@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -266,11 +267,32 @@ fun TabBeranda(
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize().background(LightGrayJco)) {
+        // Watermark halus agar area kosong tidak terlalu polos (di belakang konten)
+        Image(
+            painter = painterResource(id = R.drawable.wm_coffee_bean),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 4.dp, bottom = 130.dp)
+                .size(160.dp)
+                .rotate(-16f),
+            alpha = 0.05f
+        )
+        Image(
+            painter = painterResource(id = R.drawable.wm_leaf),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 6.dp, bottom = 210.dp)
+                .size(120.dp)
+                .rotate(20f),
+            alpha = 0.05f
+        )
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .background(LightGrayJco)
     ) {
         // Modern floating teal-gradient welcome header with rounded bottom corners
         Box(
@@ -579,6 +601,7 @@ fun TabBeranda(
         }
 
         Spacer(modifier = Modifier.height(30.dp))
+    }
     }
 }
 
@@ -1433,32 +1456,35 @@ fun TabAkunDetail(
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Ketuk peta untuk pinpoint koordinat (alamat terupdate otomatis):",
+                        text = "Ketuk atau geser pin pada peta untuk menentukan lokasi (alamat terupdate otomatis):",
                         fontSize = 11.sp,
                         color = Color.Gray,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
 
+                    val updatePinnedLocation: (LatLng) -> Unit = { p ->
+                        currentMapLocation = p
+                        tempCoords = "${p.latitude},${p.longitude}"
+                        scope.launch {
+                            val street = com.lavana.dapoer.data.GeocodingHelper.reverseGeocode(p.latitude, p.longitude)
+                            if (street.isNotBlank()) {
+                                tempAddress = street
+                            }
+                        }
+                    }
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, Color.LightGray)
+                            .height(210.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, LightOrangeJco, RoundedCornerShape(12.dp))
                     ) {
                         GoogleMapView(
                             center = currentMapLocation,
                             markers = listOf(currentMapLocation to "Alamat Pengiriman"),
-                            onMapClick = { p ->
-                                currentMapLocation = p
-                                tempCoords = "${p.latitude},${p.longitude}"
-                                scope.launch {
-                                    val street = com.lavana.dapoer.data.GeocodingHelper.reverseGeocode(p.latitude, p.longitude)
-                                    if (street.isNotBlank()) {
-                                        tempAddress = street
-                                    }
-                                }
-                            },
+                            onMapClick = updatePinnedLocation,
+                            onMarkerDragEnd = updatePinnedLocation,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -1636,7 +1662,7 @@ fun TabAkunDetail(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(
-                            painter = painterResource(id = R.drawable.profile_picture),
+                            painter = painterResource(id = R.drawable.ic_avatar_neutral),
                             contentDescription = "Avatar Profile",
                             modifier = Modifier
                                 .size(56.dp)

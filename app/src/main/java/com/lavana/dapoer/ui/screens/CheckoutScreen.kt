@@ -27,6 +27,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.lavana.dapoer.R
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -96,6 +100,25 @@ fun CheckoutScreen(
                 modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
+                // Watermark dekoratif halus di area kosong (di belakang konten)
+                Image(
+                    painter = painterResource(R.drawable.wm_coffee_bean),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(150.dp)
+                        .rotate(-20f)
+                        .align(Alignment.TopStart),
+                    alpha = 0.06f
+                )
+                Image(
+                    painter = painterResource(R.drawable.wm_leaf),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(160.dp)
+                        .rotate(15f)
+                        .align(Alignment.BottomEnd),
+                    alpha = 0.06f
+                )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
@@ -586,7 +609,7 @@ fun CheckoutScreen(
                         Spacer(modifier = Modifier.height(14.dp))
 
                         Text(
-                            "Ketuk peta untuk menentukan titik pengiriman",
+                            "Ketuk atau geser pin pada peta",
                             fontSize = 11.sp,
                             color = DarkCharcoal.copy(alpha = 0.55f)
                         )
@@ -603,10 +626,19 @@ fun CheckoutScreen(
                             GoogleMapView(
                                 center = userLocation,
                                 markers = listOf(
-                                    cafeLocation to "Dapoer Lavana",
-                                    userLocation to "Tujuan Pengiriman Anda"
+                                    userLocation to "Tujuan Pengiriman Anda",
+                                    cafeLocation to "Dapoer Lavana"
                                 ),
                                 onMapClick = { p ->
+                                    userLocation = p
+                                    coroutineScope.launch {
+                                        val street = com.lavana.dapoer.data.GeocodingHelper.reverseGeocode(p.latitude, p.longitude)
+                                        if (street.isNotBlank()) {
+                                            addressInput = street
+                                        }
+                                    }
+                                },
+                                onMarkerDragEnd = { p ->
                                     userLocation = p
                                     coroutineScope.launch {
                                         val street = com.lavana.dapoer.data.GeocodingHelper.reverseGeocode(p.latitude, p.longitude)

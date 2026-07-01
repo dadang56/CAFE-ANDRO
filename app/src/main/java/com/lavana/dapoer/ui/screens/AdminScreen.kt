@@ -3180,11 +3180,16 @@ fun ManageCategoriesDialog(
                                                                      categoryToDelete = cat to count
                                                                  }
                                                             } else {
+                                                                 // Kategori kosong (0 produk) — hapus banner (jika ada) lalu
+                                                                 // buang dari daftar secara optimistis. Kategori bawaan tak punya
+                                                                 // banner, jadi penghapusan dari DYNAMIC_CATEGORIES + reload yang
+                                                                 // membuatnya hilang.
                                                                  SupabaseClient.db["banners"].delete {
                                                                      filter { eq("title", "category|$cat") }
                                                                  }
                                                                  kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                                      CUSTOM_CATEGORIES.remove(cat)
+                                                                     DYNAMIC_CATEGORIES.remove(cat)
                                                                  }
                                                                  onCategoriesUpdated()
                                                             }
@@ -3345,6 +3350,7 @@ fun ManageCategoriesDialog(
                                                 }
                                                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                     CUSTOM_CATEGORIES.remove(delCat)
+                                                    DYNAMIC_CATEGORIES.remove(delCat)
                                                     categoryToDelete = null
                                                 }
                                                 onCategoriesUpdated()

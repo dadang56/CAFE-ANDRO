@@ -44,6 +44,12 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.RepeatMode
@@ -86,30 +92,47 @@ fun LoginScreen(
             .fillMaxSize()
             .background(LightGrayJco)
     ) {
+        // Watermark halus agar area kosong tidak terlalu polos
+        Image(
+            painter = painterResource(id = R.drawable.wm_coffee_bean),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 10.dp, bottom = 28.dp)
+                .size(150.dp)
+                .rotate(-18f),
+            alpha = 0.06f
+        )
+        Image(
+            painter = painterResource(id = R.drawable.wm_leaf),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 14.dp, bottom = 96.dp)
+                .size(120.dp)
+                .rotate(18f),
+            alpha = 0.06f
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "LogoAnim")
-            val scale by infiniteTransition.animateFloat(
-                initialValue = 0.95f,
-                targetValue = 1.05f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 2000, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "LogoScale"
-            )
-            val rotation by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 15000, easing = androidx.compose.animation.core.LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "LogoRotate"
-            )
+            // Animasi masuk logo yang bersih (fade + scale overshoot) — tanpa ring berputar.
+            val logoAlpha = remember { Animatable(0f) }
+            val logoScale = remember { Animatable(0.85f) }
+            LaunchedEffect(Unit) {
+                logoAlpha.animateTo(targetValue = 1f, animationSpec = tween(durationMillis = 600))
+            }
+            LaunchedEffect(Unit) {
+                logoScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                )
+            }
 
             // ==================== TEAL GRADIENT TOP REGION (shared) ====================
             Box(
@@ -149,51 +172,21 @@ fun LoginScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(190.dp)
-                            .graphicsLayer(scaleX = scale, scaleY = scale),
+                            .size(180.dp)
+                            .alpha(logoAlpha.value)
+                            .graphicsLayer(scaleX = logoScale.value, scaleY = logoScale.value),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Minimalist decorative spinning ring
-                        Box(
-                            modifier = Modifier
-                                .size(176.dp)
-                                .border(BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)), shape = CircleShape)
-                                .graphicsLayer(rotationZ = rotation)
-                        ) {
-                            // Small decorative dot on the ring
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(OrangeAccent, CircleShape)
-                                    .align(Alignment.TopCenter)
-                            )
-                        }
-
-                        // Dapoer Lavana Logo (white on gradient)
                         Image(
                             painter = painterResource(id = R.drawable.logo_lavana),
                             contentDescription = "Logo Dapoer Lavana",
                             modifier = Modifier
-                                .height(120.dp)
-                                .fillMaxWidth(0.78f),
+                                .height(132.dp)
+                                .fillMaxWidth(0.82f),
                             contentScale = ContentScale.Fit,
                             colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Dapoer Lavana",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.SansSerif,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = if (isRegisterScreen) "Daftar untuk mulai memesan" else "Masuk untuk melanjutkan",
-                        fontSize = 13.sp,
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
                 }
             }
 

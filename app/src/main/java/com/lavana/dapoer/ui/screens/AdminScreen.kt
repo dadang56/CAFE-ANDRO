@@ -578,6 +578,7 @@ fun TabAdminOrders() {
                         Text("Memuat data item pesanan...")
                     }
                 } else {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -773,8 +774,9 @@ fun TabAdminOrders() {
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Image(
-                                painter = painterResource(R.drawable.logo_lavana_black),
+                                painter = painterResource(R.drawable.logo_lavana),
                                 contentDescription = "Logo Dapoer Lavana",
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black),
                                 modifier = Modifier.height(48.dp)
                             )
                             Spacer(modifier = Modifier.height(6.dp))
@@ -787,10 +789,8 @@ fun TabAdminOrders() {
                             )
                         }
                     }
-                }
-            },
-            confirmButton = {
-                Column(modifier = Modifier.fillMaxWidth()) {
+
+                    Spacer(modifier = Modifier.height(16.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -801,13 +801,15 @@ fun TabAdminOrders() {
                                 val kitchenElements = buildKitchenReceiptElements(order, printOrderItems, printMenuItemsMap)
                                 doPrint(kitchenElements, "Struk dapur terkirim ke printer", "Gagal mencetak struk dapur")
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = ForestGreen),
                             border = BorderStroke(1.dp, ForestGreen)
                         ) {
-                            Icon(Icons.Default.Print, contentDescription = "Cetak Dapur", tint = ForestGreen, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Print, contentDescription = null, tint = ForestGreen, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Cetak Dapur", color = ForestGreen, fontSize = 12.sp)
+                            Text("Cetak Dapur", color = ForestGreen, fontSize = 12.sp, maxLines = 1)
                         }
                         Button(
                             onClick = {
@@ -815,12 +817,14 @@ fun TabAdminOrders() {
                                 val receiptElements = buildOrderReceiptElements(context, order, printOrderItems, printMenuItemsMap)
                                 doPrint(receiptElements, "Resi terkirim ke printer", "Gagal mencetak resi")
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
                         ) {
-                            Icon(Icons.Default.Print, contentDescription = "Cetak Resi", tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Cetak Resi", color = Color.White, fontSize = 12.sp)
+                            Text("Cetak Resi", color = Color.White, fontSize = 12.sp, maxLines = 1)
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -830,8 +834,10 @@ fun TabAdminOrders() {
                     ) {
                         Text("Tutup", color = Color.Gray)
                     }
+                    }
                 }
-            }
+            },
+            confirmButton = {}
         )
     }
 }
@@ -2320,6 +2326,8 @@ fun TabAdminProfile(onLogout: () -> Unit) {
     var cafeLon by remember { mutableStateOf("") }
     var isSavingSettings by remember { mutableStateOf(false) }
     var isSettingsLoading by remember { mutableStateOf(true) }
+    var isRestaurantOpen by remember { mutableStateOf(true) }
+    var isTogglingRestaurantOpen by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
     var suggestions by remember { mutableStateOf<List<com.lavana.dapoer.data.SearchResult>>(emptyList()) }
@@ -2592,6 +2600,7 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                     "delivery_per_km_fee" -> perKmFee = row.value.toInt().toString()
                     "cafe_latitude" -> cafeLat = row.value.toString()
                     "cafe_longitude" -> cafeLon = row.value.toString()
+                    "restaurant_open" -> isRestaurantOpen = row.value >= 1.0
                 }
             }
         } catch (e: Exception) {
@@ -2665,6 +2674,52 @@ fun TabAdminProfile(onLogout: () -> Unit) {
 
         if (!isSettingsLoading) {
             Spacer(modifier = Modifier.height(24.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                val toggleContext = LocalContext.current
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Status Warung", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = ForestGreen)
+                        Text(
+                            if (isRestaurantOpen) "Buka - pelanggan bisa memesan" else "Tutup - pelanggan tidak bisa memesan",
+                            fontSize = 12.sp,
+                            color = if (isRestaurantOpen) ForestGreen else RedPromo
+                        )
+                    }
+                    Switch(
+                        checked = isRestaurantOpen,
+                        onCheckedChange = { checked ->
+                            val previous = isRestaurantOpen
+                            isRestaurantOpen = checked
+                            isTogglingRestaurantOpen = true
+                            coroutineScope.launch {
+                                try {
+                                    SupabaseClient.db["settings"].update({
+                                        set("value", if (checked) 1.0 else 0.0)
+                                    }) { filter { eq("key", "restaurant_open") } }
+                                } catch (e: Exception) {
+                                    isRestaurantOpen = previous
+                                    android.widget.Toast.makeText(toggleContext, "Gagal mengubah status warung: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                } finally {
+                                    isTogglingRestaurantOpen = false
+                                }
+                            }
+                        },
+                        enabled = !isTogglingRestaurantOpen,
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = ForestGreen)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
@@ -3704,7 +3759,7 @@ fun buildOrderReceiptElements(
     // BAWAH: rata tengah
     elements.add(ReceiptElement.TextLine("Bill ini bukan bukti Pembayaran", align = ReceiptAlign.CENTER))
     try {
-        val logoBitmap = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.logo_lavana_black)
+        val logoBitmap = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.logo_lavana)
         if (logoBitmap != null) {
             elements.add(ReceiptElement.Logo(logoBitmap))
         }

@@ -98,7 +98,8 @@ INSERT INTO public.settings (key, value, description) VALUES
 ('latest_version_code', 12, 'versionCode APK terbaru. HARUS > versionCode app terpasang agar dialog update muncul. Naikkan tiap rilis (samakan dengan versionCode di build.gradle.kts). Deskripsi baris ini dipakai sebagai Catatan Rilis di dialog update.'),
 ('force_update', 0, 'Set 1 untuk memaksa update (dialog tidak bisa ditutup), 0 untuk opsional (ada tombol Nanti)'),
 ('cafe_latitude', -6.2297, 'Latitude lokasi Dapoer Lavana Cafe'),
-('cafe_longitude', 106.8296, 'Longitude lokasi Dapoer Lavana Cafe');
+('cafe_longitude', 106.8296, 'Longitude lokasi Dapoer Lavana Cafe'),
+('restaurant_open', 1, 'Set 1 = warung buka (pelanggan bisa memesan), 0 = warung tutup (tampilan pelanggan diganti layar Tutup)');
 
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Settings dapat dibaca siapa saja" ON public.settings FOR SELECT USING (true);

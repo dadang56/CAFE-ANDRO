@@ -106,6 +106,22 @@ fun HomeScreen(
     var isLoadingMenu by remember { mutableStateOf(true) }
     var bannerList by remember { mutableStateOf<List<BannerItem>>(emptyList()) }
 
+    // Status buka/tutup warung, dicek berkala agar pelanggan yang sudah
+    // membuka aplikasi tetap tahu jika admin menutup toko secara realtime.
+    var isRestaurantOpen by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            try {
+                val settingsList = SupabaseClient.db["settings"].select().decodeList<SettingsRow>()
+                val openValue = settingsList.find { it.key == "restaurant_open" }?.value ?: 1.0
+                isRestaurantOpen = openValue >= 1.0
+            } catch (e: Exception) {
+                // Biarkan status terakhir jika gagal memuat (mis. tidak ada koneksi)
+            }
+            kotlinx.coroutines.delay(15000)
+        }
+    }
+
     LaunchedEffect(Unit) {
         CartManager.selectedOrderType = "Delivery"
         isLoadingMenu = true
@@ -130,6 +146,11 @@ fun HomeScreen(
     }
 
     val displayMenu = menuList
+
+    if (!isLoadingMenu && !isRestaurantOpen) {
+        ClosedStoreScreen(onLogout = onLogout)
+        return
+    }
 
     Scaffold(
         bottomBar = {
@@ -198,6 +219,58 @@ fun HomeScreen(
                         onPhoneChanged = { currentPhone = it },
                         onLogout = onLogout
                     )
+                }
+            }
+        }
+    }
+}
+
+// ==========================================================
+// TAMPILAN WARUNG TUTUP (mengganti seluruh Beranda saat admin menutup toko)
+// ==========================================================
+@Composable
+fun ClosedStoreScreen(onLogout: () -> Unit) {
+    Scaffold(containerColor = DarkCharcoal) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.08f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Storefront,
+                        contentDescription = null,
+                        tint = OrangeAccent,
+                        modifier = Modifier.size(56.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Warung Sedang Tutup",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Mohon maaf, kami belum menerima pesanan saat ini.\nSilakan kembali lagi nanti.",
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(28.dp))
+                TextButton(onClick = onLogout) {
+                    Text("Keluar", color = OrangeAccent, fontWeight = FontWeight.Bold)
                 }
             }
         }

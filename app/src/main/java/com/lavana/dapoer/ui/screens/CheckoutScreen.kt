@@ -205,6 +205,7 @@ fun CheckoutScreen(
     var searchSuggestions by remember { mutableStateOf<List<com.lavana.dapoer.data.SearchResult>>(emptyList()) }
     
     var customerNameInput by remember { mutableStateOf("") }
+    var showCancelOrderDialog by remember { mutableStateOf(false) }
 
     var qrisUrl by remember { mutableStateOf("") }
     var bankName by remember { mutableStateOf("BCA") }
@@ -812,7 +813,52 @@ fun CheckoutScreen(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.5.dp, OrangeJco),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Tambah Menu Lain", color = OrangeJco, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(
+                        onClick = { showCancelOrderDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Batalkan Pesanan", color = Color(0xFFC84B4B), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                 }
+            }
+
+            if (showCancelOrderDialog) {
+                AlertDialog(
+                    onDismissRequest = { showCancelOrderDialog = false },
+                    title = { Text("Batalkan Pesanan?", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+                    text = { Text("Semua item pada keranjang akan dihapus. Anda dapat memesan kembali kapan saja.", color = DarkCharcoal.copy(alpha = 0.7f)) },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                CartManager.clearCart()
+                                showCancelOrderDialog = false
+                                onNavigateBack()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC84B4B))
+                        ) {
+                            Text("Ya, Batalkan", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showCancelOrderDialog = false }) {
+                            Text("Tidak", color = Color.Gray)
+                        }
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))

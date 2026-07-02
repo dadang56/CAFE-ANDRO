@@ -1497,7 +1497,15 @@ fun TabAdminBanners() {
         coroutineScope.launch {
             try {
                 val list = SupabaseClient.db["banners"].select().decodeList<BannerItem>()
-                banners = list.filter { it.title?.startsWith("payment_") != true }
+                // Tabel "banners" juga dipakai sebagai penampung sentinel non-banner: kategori
+                // ("category|..."), QRIS/bank ("payment_...", "bank_..."), dan URL update APK
+                // ("app_apk_url"). Semua itu HARUS disaring agar tidak muncul sebagai "banner hantu"
+                // di daftar kelola banner admin (ini akar bug "banner masih muncul padahal sudah dihapus").
+                banners = list.filter { b ->
+                    val t = b.title ?: ""
+                    !t.startsWith("payment_") && !t.startsWith("category|") &&
+                        !t.startsWith("bank_") && t != "app_apk_url"
+                }
             } catch (e: Exception) {}
             finally {
                 isLoading = false
@@ -2779,6 +2787,7 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                                         }) { filter { eq("id", oldBankBanner.id ?: "") } }
                                     } else {
                                         SupabaseClient.db["banners"].insert(BannerItem(
+                                            id = UUID.randomUUID().toString(),
                                             title = newTitle,
                                             imageUrl = "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=500"
                                         ))
@@ -2791,6 +2800,7 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                                         }) { filter { eq("id", oldQrisBanner.id ?: "") } }
                                     } else {
                                         SupabaseClient.db["banners"].insert(BannerItem(
+                                            id = UUID.randomUUID().toString(),
                                             title = "payment_qris",
                                             imageUrl = qrisUrl
                                         ))
@@ -3105,12 +3115,16 @@ fun ManageCategoriesDialog(
                                         isSaving = true
                                         coroutineScope.launch {
                                             try {
+                                                // WAJIB set id eksplisit: kolom banners.id UUID NOT NULL,
+                                                // jika id null dikirim, Postgres menolak (default tidak dipakai).
                                                 SupabaseClient.db["banners"].insert(BannerItem(
+                                                    id = UUID.randomUUID().toString(),
                                                     title = "category|$trimmed",
                                                     imageUrl = ""
                                                 ))
                                                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                    CUSTOM_CATEGORIES.add(trimmed)
+                                                    if (!CUSTOM_CATEGORIES.contains(trimmed)) CUSTOM_CATEGORIES.add(trimmed)
+                                                    if (!DYNAMIC_CATEGORIES.contains(trimmed)) DYNAMIC_CATEGORIES.add(trimmed)
                                                 }
                                                 newCategoryInput = ""
                                                 onCategoriesUpdated()

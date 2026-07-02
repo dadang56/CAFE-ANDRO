@@ -39,6 +39,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -534,6 +535,27 @@ fun TabAdminOrders() {
 
     if (selectedOrderForPrint != null) {
         val context = LocalContext.current
+
+        fun doPrint(elements: List<ReceiptElement>, successMsg: String, failMsg: String) {
+            val savedPrinter = PrinterManager.getSavedPrinter(context)
+            if (savedPrinter == null) {
+                android.widget.Toast.makeText(context, "Pilih printer dulu di Pengaturan Printer", android.widget.Toast.LENGTH_LONG).show()
+                return
+            }
+            coroutineScope.launch {
+                val result = PrinterManager.printReceipt(context, elements)
+                result.fold(
+                    onSuccess = {
+                        android.widget.Toast.makeText(context, successMsg, android.widget.Toast.LENGTH_LONG).show()
+                    },
+                    onFailure = { ex ->
+                        android.widget.Toast.makeText(context, ex.message ?: failMsg, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+            selectedOrderForPrint = null
+        }
+
         AlertDialog(
             onDismissRequest = { selectedOrderForPrint = null },
             shape = RoundedCornerShape(24.dp),
@@ -563,8 +585,9 @@ fun TabAdminOrders() {
                             .background(Color.White)
                             .border(1.dp, Color.LightGray)
                             .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.Start
                     ) {
+                        // ATAS: rata kiri
                         Text(
                             text = "DAPOER LAVANA",
                             fontWeight = FontWeight.Bold,
@@ -573,8 +596,26 @@ fun TabAdminOrders() {
                             color = Color.Black
                         )
                         Text(
-                            text = "Kopi & Selera Nusantara",
+                            text = "Warkop & Katering",
                             fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "Tlp/Wa : ${CartManager.currentStaff?.contactNumber ?: "-"}",
+                            fontSize = 11.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "Nama (Pemesan) : ${selectedOrderForPrint?.customerName ?: "-"}",
+                            fontSize = 11.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "Kasir : ${CartManager.currentStaff?.name ?: "-"}",
+                            fontSize = 11.sp,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                             color = Color.Black
                         )
@@ -584,7 +625,7 @@ fun TabAdminOrders() {
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                             color = Color.Black
                         )
-                        
+
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "No. Order : #${selectedOrderForPrint?.orderNumber}",
@@ -716,49 +757,78 @@ fun TabAdminOrders() {
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                             color = Color.Black
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Terima Kasih Atas Kunjungan Anda",
-                            fontSize = 10.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            color = Color.Black,
-                            textAlign = TextAlign.Center
-                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // BAWAH: rata tengah
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Bill ini bukan bukti Pembayaran",
+                                fontSize = 9.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Image(
+                                painter = painterResource(R.drawable.logo_lavana_black),
+                                contentDescription = "Logo Dapoer Lavana",
+                                modifier = Modifier.height(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Terima Kasih Atas Kunjungan Anda",
+                                fontSize = 10.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = Color.Black,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             },
             confirmButton = {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(onClick = { selectedOrderForPrint = null }) {
-                        Text("Tutup", color = Color.Gray)
-                    }
-                    Button(
-                        onClick = {
-                            val savedPrinter = PrinterManager.getSavedPrinter(context)
-                            if (savedPrinter == null) {
-                                android.widget.Toast.makeText(context, "Pilih printer dulu di Pengaturan Printer", android.widget.Toast.LENGTH_LONG).show()
-                            } else {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val order = selectedOrderForPrint
+                                val kitchenElements = buildKitchenReceiptElements(order, printOrderItems, printMenuItemsMap)
+                                doPrint(kitchenElements, "Struk dapur terkirim ke printer", "Gagal mencetak struk dapur")
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ForestGreen),
+                            border = BorderStroke(1.dp, ForestGreen)
+                        ) {
+                            Icon(Icons.Default.Print, contentDescription = "Cetak Dapur", tint = ForestGreen, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Cetak Dapur", color = ForestGreen, fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = {
                                 val order = selectedOrderForPrint
                                 val receiptElements = buildOrderReceiptElements(context, order, printOrderItems, printMenuItemsMap)
-                                coroutineScope.launch {
-                                    val result = PrinterManager.printReceipt(context, receiptElements)
-                                    result.fold(
-                                        onSuccess = {
-                                            android.widget.Toast.makeText(context, "Struk terkirim ke printer", android.widget.Toast.LENGTH_LONG).show()
-                                        },
-                                        onFailure = { ex ->
-                                            android.widget.Toast.makeText(context, ex.message ?: "Gagal mencetak struk", android.widget.Toast.LENGTH_LONG).show()
-                                        }
-                                    )
-                                }
-                                selectedOrderForPrint = null
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+                                doPrint(receiptElements, "Resi terkirim ke printer", "Gagal mencetak resi")
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+                        ) {
+                            Icon(Icons.Default.Print, contentDescription = "Cetak Resi", tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Cetak Resi", color = Color.White, fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(
+                        onClick = { selectedOrderForPrint = null },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Print, contentDescription = "Cetak", tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Cetak Struk", color = Color.White)
+                        Text("Tutup", color = Color.Gray)
                     }
                 }
             }
@@ -3584,8 +3654,9 @@ private fun receiptLineLR(left: String, right: String): String {
 }
 
 /**
- * Versi struk bergaya (logo + bold + rata tengah) untuk dicetak via
- * PrinterManager.printReceipt(). Menggantikan tampilan teks polos sebelumnya.
+ * Struk RESI (untuk pelanggan): identitas kafe + pemesan rata kiri di atas,
+ * rincian pesanan & total di tengah, lalu disclaimer + logo + ucapan terima
+ * kasih rata tengah di bawah. Dicetak via PrinterManager.printReceipt().
  */
 fun buildOrderReceiptElements(
     context: android.content.Context,
@@ -3595,19 +3666,16 @@ fun buildOrderReceiptElements(
 ): List<ReceiptElement> {
     if (order == null) return emptyList()
     val elements = mutableListOf<ReceiptElement>()
+    val staff = CartManager.currentStaff
 
-    try {
-        val logoBitmap = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.logo_lavana_black)
-        if (logoBitmap != null) {
-            elements.add(ReceiptElement.Logo(logoBitmap))
-            elements.add(ReceiptElement.Spacer)
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-
-    elements.add(ReceiptElement.TextLine("Kopi & Selera Nusantara", align = ReceiptAlign.CENTER))
+    // ATAS: rata kiri
+    elements.add(ReceiptElement.TextLine("DAPOER LAVANA", bold = true))
+    elements.add(ReceiptElement.TextLine("Warkop & Katering"))
+    elements.add(ReceiptElement.TextLine("Tlp/Wa : ${staff?.contactNumber ?: "-"}"))
+    elements.add(ReceiptElement.TextLine("Nama (Pemesan) : ${order.customerName ?: "-"}"))
+    elements.add(ReceiptElement.TextLine("Kasir : ${staff?.name ?: "-"}"))
     elements.add(ReceiptElement.Divider)
+
     elements.add(ReceiptElement.TextLine("No. Order : #${order.orderNumber}", bold = true))
     elements.add(ReceiptElement.TextLine("Tanggal   : ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}"))
     elements.add(ReceiptElement.TextLine("Tipe      : ${order.orderType}"))
@@ -3632,8 +3700,54 @@ fun buildOrderReceiptElements(
     elements.add(ReceiptElement.Divider)
     elements.add(ReceiptElement.TextLine("Metode: ${order.paymentMethod} (${order.paymentStatus})"))
     elements.add(ReceiptElement.Spacer)
-    elements.add(ReceiptElement.TextLine("~ Terima Kasih Atas Kunjungan Anda ~", align = ReceiptAlign.CENTER))
-    elements.add(ReceiptElement.TextLine("dapoerlavana", align = ReceiptAlign.CENTER))
+
+    // BAWAH: rata tengah
+    elements.add(ReceiptElement.TextLine("Bill ini bukan bukti Pembayaran", align = ReceiptAlign.CENTER))
+    try {
+        val logoBitmap = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.logo_lavana_black)
+        if (logoBitmap != null) {
+            elements.add(ReceiptElement.Logo(logoBitmap))
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    elements.add(ReceiptElement.TextLine("Terima Kasih Atas Kunjungan Anda", align = ReceiptAlign.CENTER))
+
+    return elements
+}
+
+/**
+ * Struk DAPUR (untuk dapur): hanya daftar item + catatan yang perlu disiapkan,
+ * tanpa harga/logo/metode pembayaran -- fokus ke apa yang harus dimasak.
+ */
+fun buildKitchenReceiptElements(
+    order: Order?,
+    items: List<OrderItem>,
+    menuMap: Map<String, MenuItem>
+): List<ReceiptElement> {
+    if (order == null) return emptyList()
+    val elements = mutableListOf<ReceiptElement>()
+
+    elements.add(ReceiptElement.TextLine("STRUK DAPUR", bold = true, align = ReceiptAlign.CENTER, doubleHeight = true))
+    elements.add(ReceiptElement.Divider)
+    elements.add(ReceiptElement.TextLine("No. Order : #${order.orderNumber}", bold = true))
+    elements.add(ReceiptElement.TextLine("Waktu     : ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}"))
+    elements.add(ReceiptElement.TextLine("Tipe      : ${order.orderType}"))
+    if (order.orderType == "Dine In" && !order.tableNumber.isNullOrBlank()) {
+        elements.add(ReceiptElement.TextLine("No. Meja  : ${order.tableNumber}"))
+    }
+    if (!order.customerName.isNullOrBlank()) {
+        elements.add(ReceiptElement.TextLine("Pemesan   : ${order.customerName}"))
+    }
+    elements.add(ReceiptElement.Divider)
+    items.forEach { item ->
+        val menuName = menuMap[item.menuItemId]?.name ?: "Item Menu"
+        elements.add(ReceiptElement.TextLine("${item.quantity}x $menuName", bold = true, doubleHeight = true))
+        if (!item.notes.isNullOrBlank()) {
+            elements.add(ReceiptElement.TextLine("  * Catatan: ${item.notes}"))
+        }
+    }
+    elements.add(ReceiptElement.Divider)
 
     return elements
 }

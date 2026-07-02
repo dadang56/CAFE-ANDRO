@@ -75,7 +75,8 @@ data class Order(
     @SerialName("cashier_username") val cashierUsername: String? = null,
     @SerialName("delivery_proof_url") val deliveryProofUrl: String? = null,
     @SerialName("delivery_distance_meters") val deliveryDistanceMeters: Double? = null,
-    @SerialName("delivery_within_tolerance") val deliveryWithinTolerance: Boolean? = null
+    @SerialName("delivery_within_tolerance") val deliveryWithinTolerance: Boolean? = null,
+    @SerialName("customer_name") val customerName: String? = null
 )
 
 @Serializable

@@ -124,6 +124,7 @@ CREATE TABLE public.orders (
     payment_receipt_url TEXT, -- URL bukti transfer yang diunggah
     notes TEXT,
     customer_phone TEXT,
+    customer_name TEXT, -- Nama pemesan, dicetak di resi & struk dapur
     coordinates TEXT, -- "latitude,longitude"
     driver_id UUID, -- ID kurir yang ditugaskan
     cashier_username TEXT, -- Kasir pencatat order

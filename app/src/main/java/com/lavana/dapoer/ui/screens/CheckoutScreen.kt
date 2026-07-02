@@ -204,6 +204,8 @@ fun CheckoutScreen(
     var isSearchingAddress by remember { mutableStateOf(false) }
     var searchSuggestions by remember { mutableStateOf<List<com.lavana.dapoer.data.SearchResult>>(emptyList()) }
     
+    var customerNameInput by remember { mutableStateOf("") }
+
     var qrisUrl by remember { mutableStateOf("") }
     var bankName by remember { mutableStateOf("BCA") }
     var bankNo by remember { mutableStateOf("1234567890") }
@@ -408,7 +410,8 @@ fun CheckoutScreen(
                                         paymentMethod = "Belum Memilih",
                                         paymentStatus = "Belum Bayar",
                                         coordinates = if (orderType == "Delivery") "${userLocation.latitude},${userLocation.longitude}" else null,
-                                        notes = "Dipesan via Android App"
+                                        notes = "Dipesan via Android App",
+                                        customerName = customerNameInput.trim().ifBlank { null }
                                     )
 
                                     // 1. Kirim order ke Supabase
@@ -484,6 +487,33 @@ fun CheckoutScreen(
                 .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
+
+            // Nama Pemesan (dicetak di resi & struk dapur)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Nama Pemesan", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = customerNameInput,
+                        onValueChange = { customerNameInput = it },
+                        placeholder = { Text("Nama untuk struk (opsional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = OrangeJco,
+                            unfocusedBorderColor = Color.LightGray
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // JIKA DELIVERY: Tampilkan Peta Google Maps Interaktif
             if (orderType == "Delivery") {

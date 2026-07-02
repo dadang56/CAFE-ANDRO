@@ -7,8 +7,10 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.realtime.realtime
+import io.github.jan.supabase.serializer.KotlinXSerializer
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.storage.storage
+import kotlinx.serialization.json.Json
 
 object SupabaseClient {
     const val SUPABASE_URL = "https://mtjyggxyjojcvcjxiblo.supabase.co"
@@ -18,6 +20,18 @@ object SupabaseClient {
         supabaseUrl = SUPABASE_URL,
         supabaseKey = SUPABASE_KEY
     ) {
+        // coerceInputValues: kolom DB yang NULLABLE tanpa default (mis. description,
+        // image_url pada menu_items) tersimpan NULL bila field itu tidak dikirim saat
+        // insert (encodeDefaults=false membuang field yang nilainya sama dengan default
+        // Kotlin, mis. ""). Tanpa flag ini, decode baris ber-NULL ke properti non-null
+        // ("String") melempar JsonDecodingException dan MENGGAGALKAN SELURUH daftar
+        // (bukan cuma 1 baris) -- inilah sebab "tambah menu tidak muncul, tanpa
+        // notifikasi": exception itu tertangkap diam-diam di initializeMenuIfEmpty()
+        // dan cuma di-printStackTrace, mengembalikan list kosong.
+        defaultSerializer = KotlinXSerializer(Json {
+            ignoreUnknownKeys = true
+            coerceInputValues = true
+        })
         install(Auth)      // Autentikasi User (Login/Register)
         install(Postgrest) // CRUD Query Database (Insert, Select, Update, Delete)
         install(Realtime)  // Sinkronisasi Pesanan Real-time

@@ -365,7 +365,44 @@ fun TrackingScreen(
                 }
             }
             
-            if (order != null && (order?.paymentStatus == "Belum Bayar" || order?.paymentStatus == "Ditolak")) {
+            if (order?.status == "Dibatalkan" || order?.paymentStatus == "Ditolak") {
+                // Pesanan sudah ditutup admin -- tidak lagi menawarkan retry upload bukti untuk
+                // pesanan YANG SAMA (bisa membingungkan). Tampilkan alasan + arahkan pesan baru.
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, RedPromo.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Pesanan Dibatalkan", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = RedPromo)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Alasan: $rejectionReason",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = RedPromo
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            "Pesanan ini tidak dapat dilanjutkan. Silakan buat pesanan baru dari Beranda.",
+                            fontSize = 12.sp,
+                            color = DarkCharcoal
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Button(
+                            onClick = onNavigateHome,
+                            modifier = Modifier.fillMaxWidth().height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                        ) {
+                            Text("Pesan Lagi", color = OnAccentDark, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            } else if (order != null && order?.paymentStatus == "Belum Bayar") {
                 Spacer(modifier = Modifier.height(16.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -376,22 +413,12 @@ fun TrackingScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = if (order?.paymentStatus == "Ditolak") "Pembayaran Ditolak Admin" else "Penyelesaian Pembayaran",
+                            text = "Penyelesaian Pembayaran",
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
-                            color = if (order?.paymentStatus == "Ditolak") Color.Red else OrangeJco
+                            color = OrangeJco
                         )
-                        
-                        if (order?.paymentStatus == "Ditolak") {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Alasan: $rejectionReason",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.Red
-                            )
-                        }
-                        
+
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Silakan pilih metode pembayaran dan unggah bukti transfer:", fontSize = 12.sp, color = DarkCharcoal)
                         
@@ -523,7 +550,8 @@ fun TrackingScreen(
                         }
                         
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Unggah Bukti Pembayaran", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 12.sp)
+                        Text("Unggah Bukti Pembayaran (Opsional)", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 12.sp)
+                        Text("Boleh dilewati -- pembayaran akan dicek manual oleh admin.", fontSize = 11.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(6.dp))
                         
                         val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -559,50 +587,53 @@ fun TrackingScreen(
                         
                         Button(
                             onClick = {
-                                if (uploadedFileUri == null) {
-                                    uploadError = "Silakan pilih gambar bukti bayar terlebih dahulu!"
-                                    return@Button
-                                }
+                                // Bukti bayar OPSIONAL -- admin akan cek pembayaran secara manual
+                                // (mis. mutasi rekening/QRIS merchant), jadi tidak lagi diblokir bila
+                                // pelanggan tidak melampirkan foto.
                                 isUploadingPayment = true
                                 uploadError = null
                                 coroutineScope.launch {
                                     try {
-                                        var publicUrl = "https://mtjyggxyjojcvcjxiblo.supabase.co/storage/v1/object/public/menu-images/qris_barcode.png"
-                                        try {
-                                            val inputStream = context.contentResolver.openInputStream(uploadedFileUri!!)
-                                            val bytes = inputStream?.readBytes()
-                                            inputStream?.close()
-                                            if (bytes != null) {
-                                                val fileName = uploadedFileName ?: "bukti_bayar_${orderId}.jpg"
-                                                val bucket = SupabaseClient.storage["menu-images"]
+                                        var publicUrl: String? = null
+                                        if (uploadedFileUri != null) {
+                                            try {
+                                                val inputStream = context.contentResolver.openInputStream(uploadedFileUri!!)
+                                                val bytes = inputStream?.readBytes()
+                                                inputStream?.close()
+                                                if (bytes != null) {
+                                                    val fileName = uploadedFileName ?: "bukti_bayar_${orderId}.jpg"
+                                                    val bucket = SupabaseClient.storage["menu-images"]
 
-                                                // Hapus bukti lama jika ada agar storage tidak menumpuk file yatim.
-                                                try {
-                                                    val oldUrl = order?.paymentReceiptUrl
-                                                    val bucketPath = "/storage/v1/object/public/menu-images/"
-                                                    if (oldUrl != null && oldUrl.contains(bucketPath)) {
-                                                        val oldFile = oldUrl.substringAfter(bucketPath).substringBefore("?")
-                                                        if (oldFile.isNotBlank() && oldFile != "qris_barcode.png") {
-                                                            bucket.delete(oldFile)
+                                                    // Hapus bukti lama jika ada agar storage tidak menumpuk file yatim.
+                                                    try {
+                                                        val oldUrl = order?.paymentReceiptUrl
+                                                        val bucketPath = "/storage/v1/object/public/menu-images/"
+                                                        if (oldUrl != null && oldUrl.contains(bucketPath)) {
+                                                            val oldFile = oldUrl.substringAfter(bucketPath).substringBefore("?")
+                                                            if (oldFile.isNotBlank() && oldFile != "qris_barcode.png") {
+                                                                bucket.delete(oldFile)
+                                                            }
                                                         }
+                                                    } catch (e: Exception) {
+                                                        e.printStackTrace()
                                                     }
-                                                } catch (e: Exception) {
-                                                    e.printStackTrace()
-                                                }
 
-                                                bucket.upload(fileName, bytes)
-                                                publicUrl = bucket.publicUrl(fileName)
+                                                    bucket.upload(fileName, bytes)
+                                                    publicUrl = bucket.publicUrl(fileName)
+                                                }
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
                                             }
-                                        } catch (e: Exception) {
-                                            e.printStackTrace()
                                         }
 
                                         SupabaseClient.db["orders"].update({
                                             set("payment_status", "Menunggu Verifikasi")
                                             set("payment_method", selectedPayment)
-                                            set("payment_receipt_url", publicUrl)
+                                            if (publicUrl != null) {
+                                                set("payment_receipt_url", publicUrl)
+                                            }
                                         }) { filter { eq("id", orderId) } }
-                                        
+
                                         isUploadingPayment = false
                                         showThankYouDialog = true
                                         loadOrder()

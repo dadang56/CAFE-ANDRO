@@ -1,5 +1,6 @@
 package com.lavana.dapoer.ui.screens
 
+import com.lavana.dapoer.R
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -363,7 +364,12 @@ fun TabAdminOrders() {
                             onRejectPayment = { reason ->
                                 coroutineScope.launch {
                                     try {
+                                        // Set status jadi "Dibatalkan" (bukan tetap "Pending") agar pesanan
+                                        // ini berhenti tampil dengan tombol Konfirmasi/Tolak -- sebelumnya
+                                        // status tidak diubah sehingga pesanan yang sudah ditolak tetap
+                                        // "menggantung" di daftar aksi admin seolah masih perlu diproses.
                                         SupabaseClient.db["orders"].update({
+                                            set("status", "Dibatalkan")
                                             set("payment_status", "Ditolak")
                                             set("notes", "[Ditolak: $reason]")
                                         }) { filter { eq("id", order.id ?: "") } }
@@ -733,9 +739,9 @@ fun TabAdminOrders() {
                                 android.widget.Toast.makeText(context, "Pilih printer dulu di Pengaturan Printer", android.widget.Toast.LENGTH_LONG).show()
                             } else {
                                 val order = selectedOrderForPrint
-                                val receiptText = buildOrderReceiptText(order, printOrderItems, printMenuItemsMap)
+                                val receiptElements = buildOrderReceiptElements(context, order, printOrderItems, printMenuItemsMap)
                                 coroutineScope.launch {
-                                    val result = PrinterManager.printText(context, receiptText)
+                                    val result = PrinterManager.printReceipt(context, receiptElements)
                                     result.fold(
                                         onSuccess = {
                                             android.widget.Toast.makeText(context, "Struk terkirim ke printer", android.widget.Toast.LENGTH_LONG).show()
@@ -800,6 +806,7 @@ fun AdminOrderCard(
                                 "Diproses" -> Color(0xFFDBEAFE)
                                 "Diantar" -> Color(0xFFE0F2FE)
                                 "Selesai" -> Color(0xFFD1FAE5)
+                                "Dibatalkan" -> Color(0xFFFEE2E2)
                                 else -> Color.LightGray
                             }
                         )
@@ -814,6 +821,7 @@ fun AdminOrderCard(
                             "Diproses" -> Color(0xFF2563EB)
                             "Diantar" -> Color(0xFF0284C7)
                             "Selesai" -> Color(0xFF059669)
+                            "Dibatalkan" -> RedPromo
                             else -> Color.DarkGray
                         }
                     )
@@ -864,15 +872,17 @@ fun AdminOrderCard(
                     Text("Cetak Struk", color = ForestGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
-                IconButton(
+                OutlinedButton(
                     onClick = onOpenChat,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(LightOrangeJco)
-                        .border(1.dp, OrangeJco, RoundedCornerShape(8.dp))
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
+                    border = BorderStroke(1.dp, OrangeJco),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(36.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
                 ) {
-                    Icon(Icons.Default.Chat, contentDescription = "Chat dengan Pelanggan", tint = OrangeJco, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Chat, contentDescription = "Chat", tint = OrangeJco, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Chat", color = OrangeJco, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
                 if (!order.paymentReceiptUrl.isNullOrBlank()) {
@@ -3573,50 +3583,59 @@ private fun receiptLineLR(left: String, right: String): String {
     }
 }
 
-private fun receiptCenter(text: String): String {
-    if (text.length >= RECEIPT_WIDTH) return text
-    val pad = (RECEIPT_WIDTH - text.length) / 2
-    return " ".repeat(pad) + text
-}
-
-fun buildOrderReceiptText(
+/**
+ * Versi struk bergaya (logo + bold + rata tengah) untuk dicetak via
+ * PrinterManager.printReceipt(). Menggantikan tampilan teks polos sebelumnya.
+ */
+fun buildOrderReceiptElements(
+    context: android.content.Context,
     order: Order?,
     items: List<OrderItem>,
     menuMap: Map<String, MenuItem>
-): String {
-    if (order == null) return ""
-    val divider = "-".repeat(RECEIPT_WIDTH)
-    return buildString {
-        appendLine(receiptCenter("DAPOER LAVANA"))
-        appendLine(receiptCenter("Kopi & Selera Nusantara"))
-        appendLine(divider)
-        appendLine("No. Order : #${order.orderNumber}")
-        appendLine("Tanggal   : ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}")
-        appendLine("Tipe      : ${order.orderType}")
-        if (!order.customerPhone.isNullOrBlank()) {
-            appendLine("Telp      : ${order.customerPhone}")
+): List<ReceiptElement> {
+    if (order == null) return emptyList()
+    val elements = mutableListOf<ReceiptElement>()
+
+    try {
+        val logoBitmap = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.logo_lavana_black)
+        if (logoBitmap != null) {
+            elements.add(ReceiptElement.Logo(logoBitmap))
+            elements.add(ReceiptElement.Spacer)
         }
-        appendLine(divider)
-        items.forEach { item ->
-            val menuName = menuMap[item.menuItemId]?.name ?: "Item Menu"
-            val priceStr = "Rp ${String.format("%,.0f", item.priceAtOrder * item.quantity)}"
-            appendLine(receiptLineLR("$menuName x${item.quantity}", priceStr))
-            if (!item.notes.isNullOrBlank()) {
-                appendLine("  * Notes: ${item.notes}")
-            }
-        }
-        appendLine(divider)
-        appendLine(receiptLineLR("Subtotal", "Rp ${String.format("%,.0f", order.subtotal)}"))
-        if (order.deliveryFee > 0.0) {
-            appendLine(receiptLineLR("Ongkir", "Rp ${String.format("%,.0f", order.deliveryFee)}"))
-        }
-        appendLine(receiptLineLR("TOTAL", "Rp ${String.format("%,.0f", order.total)}"))
-        appendLine(divider)
-        appendLine("Metode: ${order.paymentMethod} (${order.paymentStatus})")
-        appendLine()
-        appendLine(receiptCenter("Terima Kasih Atas"))
-        appendLine(receiptCenter("Kunjungan Anda"))
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
+
+    elements.add(ReceiptElement.TextLine("Kopi & Selera Nusantara", align = ReceiptAlign.CENTER))
+    elements.add(ReceiptElement.Divider)
+    elements.add(ReceiptElement.TextLine("No. Order : #${order.orderNumber}", bold = true))
+    elements.add(ReceiptElement.TextLine("Tanggal   : ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}"))
+    elements.add(ReceiptElement.TextLine("Tipe      : ${order.orderType}"))
+    if (!order.customerPhone.isNullOrBlank()) {
+        elements.add(ReceiptElement.TextLine("Telp      : ${order.customerPhone}"))
+    }
+    elements.add(ReceiptElement.Divider)
+    items.forEach { item ->
+        val menuName = menuMap[item.menuItemId]?.name ?: "Item Menu"
+        val priceStr = "Rp ${String.format("%,.0f", item.priceAtOrder * item.quantity)}"
+        elements.add(ReceiptElement.TextLine(receiptLineLR("$menuName x${item.quantity}", priceStr)))
+        if (!item.notes.isNullOrBlank()) {
+            elements.add(ReceiptElement.TextLine("  * Catatan: ${item.notes}"))
+        }
+    }
+    elements.add(ReceiptElement.Divider)
+    elements.add(ReceiptElement.TextLine(receiptLineLR("Subtotal", "Rp ${String.format("%,.0f", order.subtotal)}")))
+    if (order.deliveryFee > 0.0) {
+        elements.add(ReceiptElement.TextLine(receiptLineLR("Ongkir", "Rp ${String.format("%,.0f", order.deliveryFee)}")))
+    }
+    elements.add(ReceiptElement.TextLine(receiptLineLR("TOTAL", "Rp ${String.format("%,.0f", order.total)}"), bold = true))
+    elements.add(ReceiptElement.Divider)
+    elements.add(ReceiptElement.TextLine("Metode: ${order.paymentMethod} (${order.paymentStatus})"))
+    elements.add(ReceiptElement.Spacer)
+    elements.add(ReceiptElement.TextLine("~ Terima Kasih Atas Kunjungan Anda ~", align = ReceiptAlign.CENTER))
+    elements.add(ReceiptElement.TextLine("dapoerlavana", align = ReceiptAlign.CENTER))
+
+    return elements
 }
 
 // ==========================================================

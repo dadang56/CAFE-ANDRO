@@ -9,6 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -372,18 +373,24 @@ fun DapoerLavanaAppNavigation() {
         composable("login") {
             LoginScreen(
                 onNavigateToCustomer = {
+                    // Bersihkan SELURUH back stack (bukan cuma "login") -- sebelumnya hanya
+                    // "login" yang di-pop, sehingga "home" yang tersembunyi DI BAWAH "login"
+                    // (mis. saat Guest ditendang ke Login dari Beranda) tetap ada di back
+                    // stack. Tombol back Android lalu bisa "mundur" ke Beranda lama sambil
+                    // sesi login yang baru (mis. Admin) masih aktif -- bug: tampilan beralih
+                    // ke laman pelanggan tapi identitas admin masih terpasang.
                     navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     }
                 },
                 onNavigateToAdmin = {
                     navController.navigate("admin_dashboard") {
-                        popUpTo("login") { inclusive = true }
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     }
                 },
                 onNavigateToDriver = {
                     navController.navigate("driver_dashboard") {
-                        popUpTo("login") { inclusive = true }
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     }
                 },
                 onNavigateBack = {

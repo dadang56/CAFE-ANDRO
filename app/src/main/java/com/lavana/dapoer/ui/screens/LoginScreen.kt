@@ -172,7 +172,7 @@ fun LoginScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(180.dp)
+                            .size(240.dp)
                             .alpha(logoAlpha.value)
                             .graphicsLayer(scaleX = logoScale.value, scaleY = logoScale.value),
                         contentAlignment = Alignment.Center
@@ -181,8 +181,8 @@ fun LoginScreen(
                             painter = painterResource(id = R.drawable.logo_lavana),
                             contentDescription = "Logo Dapoer Lavana",
                             modifier = Modifier
-                                .height(132.dp)
-                                .fillMaxWidth(0.82f),
+                                .height(190.dp)
+                                .fillMaxWidth(0.92f),
                             contentScale = ContentScale.Fit,
                             colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
                         )

@@ -197,6 +197,7 @@ fun TabAdminOrders() {
     var selectedOrderForDriver by remember { mutableStateOf<Order?>(null) }
     var showAssignDialog by remember { mutableStateOf(false) }
     var previewReceiptUrl by remember { mutableStateOf<String?>(null) }
+    var chatOrder by remember { mutableStateOf<Order?>(null) }
 
     var selectedOrderForPrint by remember { mutableStateOf<Order?>(null) }
     var printOrderItems by remember { mutableStateOf<List<OrderItem>>(emptyList()) }
@@ -356,6 +357,9 @@ fun TabAdminOrders() {
                             onPrintReceipt = {
                                 fetchPrintItems(order)
                             },
+                            onOpenChat = {
+                                chatOrder = order
+                            },
                             onRejectPayment = { reason ->
                                 coroutineScope.launch {
                                     try {
@@ -441,10 +445,20 @@ fun TabAdminOrders() {
         )
     }
 
+    if (chatOrder != null) {
+        ChatDialog(
+            orderId = chatOrder?.id ?: "",
+            orderNumber = chatOrder?.orderNumber,
+            currentSenderRole = "Admin",
+            currentSenderName = "Admin Dapoer Lavana",
+            onDismiss = { chatOrder = null }
+        )
+    }
+
     if (previewReceiptUrl != null) {
         var isImageError by remember { mutableStateOf(false) }
         var isImageLoading by remember { mutableStateOf(true) }
-        
+
         AlertDialog(
             onDismissRequest = { previewReceiptUrl = null },
             shape = RoundedCornerShape(24.dp),
@@ -754,6 +768,7 @@ fun AdminOrderCard(
     onAssignDriverClick: () -> Unit,
     onShowReceipt: (String) -> Unit,
     onPrintReceipt: () -> Unit,
+    onOpenChat: () -> Unit,
     onRejectPayment: (String) -> Unit
 ) {
     var showRejectDialog by remember { mutableStateOf(false) }
@@ -812,6 +827,19 @@ fun AdminOrderCard(
             if (order.status == "Diantar" || order.status == "Selesai") {
                 Text("Kurir: $assignedDriverName", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OrangeJco)
             }
+            if (order.deliveryWithinTolerance == false) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.WarningAmber, contentDescription = null, tint = RedPromo, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "Jarak Tidak Sesuai (~${order.deliveryDistanceMeters?.toInt() ?: "-"}m dari alamat) - mohon dicek",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = RedPromo
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
             // Baris 1: aksi sekunder/info. Dipisah dari aksi status agar tidak berebut
@@ -834,6 +862,17 @@ fun AdminOrderCard(
                     Icon(Icons.Default.Print, contentDescription = "Cetak", tint = ForestGreen, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Cetak Struk", color = ForestGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                IconButton(
+                    onClick = onOpenChat,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(LightOrangeJco)
+                        .border(1.dp, OrangeJco, RoundedCornerShape(8.dp))
+                ) {
+                    Icon(Icons.Default.Chat, contentDescription = "Chat dengan Pelanggan", tint = OrangeJco, modifier = Modifier.size(18.dp))
                 }
 
                 if (!order.paymentReceiptUrl.isNullOrBlank()) {
@@ -2053,18 +2092,33 @@ fun TabAdminReports() {
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text("Pesanan #${order.orderNumber}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        Text("Waktu: ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}", fontSize = 10.sp, color = Color.Gray)
+                                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text("Pesanan #${order.orderNumber}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            Text("Waktu: ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}", fontSize = 10.sp, color = Color.Gray)
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("Rp ${String.format("%,.0f", order.total)}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = ForestGreen)
+                                            Text(order.paymentMethod, fontSize = 10.sp, color = OrangeJco)
+                                        }
                                     }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("Rp ${String.format("%,.0f", order.total)}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = ForestGreen)
-                                        Text(order.paymentMethod, fontSize = 10.sp, color = OrangeJco)
+                                    if (order.deliveryWithinTolerance == false) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.WarningAmber, contentDescription = null, tint = RedPromo, modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                "Jarak pengantaran tidak sesuai (~${order.deliveryDistanceMeters?.toInt() ?: "-"}m)",
+                                                fontSize = 10.sp,
+                                                color = RedPromo,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
                                     }
                                 }
                             }

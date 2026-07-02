@@ -126,7 +126,10 @@ CREATE TABLE public.orders (
     customer_phone TEXT,
     coordinates TEXT, -- "latitude,longitude"
     driver_id UUID, -- ID kurir yang ditugaskan
-    cashier_username TEXT -- Kasir pencatat order
+    cashier_username TEXT, -- Kasir pencatat order
+    delivery_proof_url TEXT, -- Foto bukti driver sampai lokasi
+    delivery_distance_meters NUMERIC, -- Jarak driver ke titik alamat saat foto diambil
+    delivery_within_tolerance BOOLEAN -- false = jarak melebihi toleransi (100m), perlu dicek admin
 );
 
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
@@ -147,6 +150,20 @@ CREATE TABLE public.order_items (
 
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Item pesanan dapat diakses siapa saja" ON public.order_items FOR ALL USING (true);
+
+-- 6.5 Tabel Chat (Admin <-> Pelanggan, per pesanan)
+CREATE TABLE public.chat_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE NOT NULL,
+    sender_role TEXT NOT NULL, -- 'Admin' atau 'Customer'
+    sender_name TEXT,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Chat dapat diakses siapa saja" ON public.chat_messages FOR ALL USING (true);
+ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
 
 -- ==========================================
 -- DATA CONTOH SEEDING (MENU AWAL KAFE)

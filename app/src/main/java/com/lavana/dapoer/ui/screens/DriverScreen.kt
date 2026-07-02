@@ -110,6 +110,7 @@ fun TabDriverActive() {
     var activeOrder by remember { mutableStateOf<Order?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var isSimulating by remember { mutableStateOf(false) }
+    var showDeliveryConfirmDialog by remember { mutableStateOf(false) }
 
     val driverId = remember { SupabaseClient.currentUserId ?: "00000000-0000-0000-0000-0000000000d1" }
 
@@ -413,33 +414,31 @@ fun TabDriverActive() {
                             }
                         } else {
                             Button(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        try {
-                                            isSimulating = false
-                                            CartManager.stopDriverSimulation(order.id ?: "")
-
-                                            SupabaseClient.db["orders"].update({
-                                                set("status", "Selesai")
-                                                set("payment_status", "Terbayar")
-                                            }) { filter { eq("id", order.id ?: "") } }
-
-                                            loadActiveTask()
-                                        } catch (e: Exception) {}
-                                    }
-                                },
+                                onClick = { showDeliveryConfirmDialog = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
                                 modifier = Modifier.fillMaxWidth().height(52.dp),
                                 shape = RoundedCornerShape(14.dp)
                             ) {
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Selesai Kirim", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("Konfirmasi Sampai (Foto)", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
+            }
+
+            if (showDeliveryConfirmDialog) {
+                DeliveryConfirmDialog(
+                    order = order,
+                    onDismiss = { showDeliveryConfirmDialog = false },
+                    onConfirmed = {
+                        CartManager.stopDriverSimulation(order.id ?: "")
+                        isSimulating = false
+                        loadActiveTask()
+                    }
+                )
             }
         }
         }

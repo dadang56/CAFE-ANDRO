@@ -72,7 +72,20 @@ data class Order(
     @SerialName("customer_phone") val customerPhone: String? = null,
     val coordinates: String? = null, // "lat,lon"
     @SerialName("driver_id") val driverId: String? = null,
-    @SerialName("cashier_username") val cashierUsername: String? = null
+    @SerialName("cashier_username") val cashierUsername: String? = null,
+    @SerialName("delivery_proof_url") val deliveryProofUrl: String? = null,
+    @SerialName("delivery_distance_meters") val deliveryDistanceMeters: Double? = null,
+    @SerialName("delivery_within_tolerance") val deliveryWithinTolerance: Boolean? = null
+)
+
+@Serializable
+data class ChatMessage(
+    val id: String? = null,
+    @SerialName("order_id") val orderId: String,
+    @SerialName("sender_role") val senderRole: String, // "Admin" atau "Customer"
+    @SerialName("sender_name") val senderName: String? = null,
+    val message: String,
+    @SerialName("created_at") val createdAt: String? = null
 )
 
 @Serializable
@@ -116,6 +129,21 @@ fun appendDriverLocation(notes: String?, location: LatLng): String {
     val tag = "[DriverLoc:${location.latitude},${location.longitude}]"
     return if (clean.isEmpty()) tag else "$clean $tag"
 }
+
+// Jarak antara dua titik koordinat dalam METER (formula Haversine).
+fun distanceInMeters(a: LatLng, b: LatLng): Double {
+    val earthRadiusM = 6371000.0
+    val dLat = Math.toRadians(b.latitude - a.latitude)
+    val dLon = Math.toRadians(b.longitude - a.longitude)
+    val lat1 = Math.toRadians(a.latitude)
+    val lat2 = Math.toRadians(b.latitude)
+    val h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    val c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+    return earthRadiusM * c
+}
+
+const val DELIVERY_DISTANCE_TOLERANCE_METERS = 100.0
 
 fun getFallbackMenu(): List<MenuItem> {
     return listOf(

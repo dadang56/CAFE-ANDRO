@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -66,6 +67,7 @@ fun TrackingScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var showReceiptDialog by remember { mutableStateOf(false) }
+    var showChatDialog by remember { mutableStateOf(false) }
 
     var qrisUrl by remember { mutableStateOf("") }
     var bankName by remember { mutableStateOf("BCA") }
@@ -263,6 +265,13 @@ fun TrackingScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateHome) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Kembali ke Beranda", tint = DarkCharcoal)
+                    }
+                },
+                actions = {
+                    if (order?.id != null) {
+                        IconButton(onClick = { showChatDialog = true }) {
+                            Icon(Icons.Default.Chat, contentDescription = "Chat dengan Admin", tint = OrangeJco)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -796,6 +805,16 @@ fun TrackingScreen(
                     orderItems = orderItems,
                     menuItemsMap = menuItemsMap,
                     onDismiss = { showReceiptDialog = false }
+                )
+            }
+            if (showChatDialog && order?.id != null) {
+                val customerName = remember { SupabaseClient.currentUserEmail?.substringBefore("@") ?: "Pelanggan" }
+                ChatDialog(
+                    orderId = order!!.id!!,
+                    orderNumber = order?.orderNumber,
+                    currentSenderRole = "Customer",
+                    currentSenderName = customerName,
+                    onDismiss = { showChatDialog = false }
                 )
             }
             if (showThankYouDialog) {

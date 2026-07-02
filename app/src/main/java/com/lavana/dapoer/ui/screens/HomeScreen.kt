@@ -890,7 +890,7 @@ fun TabOrderHistory(
     val coroutineScope = rememberCoroutineScope()
     var orderHistory by remember { mutableStateOf<List<Order>>(emptyList()) }
     var isLoadingHistory by remember { mutableStateOf(false) }
-    var activeSubTab by remember { mutableIntStateOf(0) } // 0: Dalam Proses, 1: Selesai
+    var activeSubTab by remember { mutableIntStateOf(0) } // 0: Dalam Proses, 1: Selesai, 2: Dibatalkan
     
     val orderDetails = remember { mutableStateMapOf<String, List<OrderItem>>() }
     val menuItemsMap = remember { mutableStateMapOf<String, String>() }
@@ -979,14 +979,23 @@ fun TabOrderHistory(
                     onClick = { activeSubTab = 1 },
                     text = { Text("Selesai", fontWeight = FontWeight.Bold) }
                 )
+                Tab(
+                    selected = activeSubTab == 2,
+                    onClick = { activeSubTab = 2 },
+                    text = { Text("Dibatalkan", fontWeight = FontWeight.Bold) }
+                )
             }
 
             val inProcessStatuses = listOf("Pending", "Diproses", "Diantar", "Menunggu Driver", "Driver Sampai")
+            // Beberapa order lama ditolak sebelum status "Dibatalkan" diterapkan, sehingga
+            // hanya payment_status="Ditolak" yang berubah -- deteksi keduanya (sama seperti
+            // TrackingScreen) agar tidak nyangkut di tab "Dalam Proses".
+            fun isCancelledOrder(order: Order) = order.status == "Dibatalkan" || order.paymentStatus == "Ditolak"
             val filteredOrders = remember(orderHistory, activeSubTab) {
-                if (activeSubTab == 0) {
-                    orderHistory.filter { it.status in inProcessStatuses }
-                } else {
-                    orderHistory.filter { it.status !in inProcessStatuses }
+                when (activeSubTab) {
+                    0 -> orderHistory.filter { !isCancelledOrder(it) && it.status in inProcessStatuses }
+                    1 -> orderHistory.filter { !isCancelledOrder(it) && it.status == "Selesai" }
+                    else -> orderHistory.filter { isCancelledOrder(it) }
                 }
             }
 
@@ -1082,23 +1091,26 @@ fun TabOrderHistory(
                                             color = OrangeJco
                                         )
                                     }
+                                    val displayStatus = if (isCancelledOrder(order)) "Dibatalkan" else order.status
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
                                             .background(
-                                                when (order.status) {
+                                                when (displayStatus) {
                                                     "Selesai" -> Color(0xFFE8F5E9)
                                                     "Pending" -> Color(0xFFFFF3E0)
+                                                    "Dibatalkan" -> Color(0xFFFEE2E2)
                                                     else -> LightOrangeJco
                                                 }
                                             )
                                             .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
                                         Text(
-                                            text = order.status,
-                                            color = when (order.status) {
+                                            text = displayStatus,
+                                            color = when (displayStatus) {
                                                 "Selesai" -> Color(0xFF2E7D32)
                                                 "Pending" -> Color(0xFFE65100)
+                                                "Dibatalkan" -> Color(0xFFC84B4B)
                                                 else -> OrangeJco
                                             },
                                             fontSize = 10.sp,
@@ -1330,6 +1342,35 @@ fun TabAkunDetail(
     var showPhoneDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+
+    val coroutineScopeAvatar = rememberCoroutineScope()
+    var avatarUrl by remember { mutableStateOf(if (userEmail != null) sharedPref.getString("avatar_$userEmail", null) else null) }
+    var isUploadingAvatar by remember { mutableStateOf(false) }
+    val avatarPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null && userEmail != null) {
+            isUploadingAvatar = true
+            coroutineScopeAvatar.launch {
+                try {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    if (bytes != null) {
+                        val fileName = "avatars/avatar_${System.currentTimeMillis()}.jpg"
+                        val bucket = SupabaseClient.storage["menu-images"]
+                        bucket.upload(fileName, bytes, upsert = true)
+                        val newUrl = bucket.publicUrl(fileName)
+                        sharedPref.edit().putString("avatar_$userEmail", newUrl).apply()
+                        avatarUrl = newUrl
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    android.widget.Toast.makeText(context, "Gagal mengunggah foto profil: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                } finally {
+                    isUploadingAvatar = false
+                }
+            }
+        }
+    }
 
     // Dialog Phone Number
     if (showPhoneDialog) {
@@ -1703,7 +1744,81 @@ fun TabAkunDetail(
             .fillMaxSize()
             .background(LightGrayJco)
     ) {
-        JcoOrangeTopBar(title = "Akun")
+        // Banner Akun: gradient + avatar besar yang bisa diganti (bukan top bar polos lagi)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                .padding(top = 22.dp, bottom = 28.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Akun", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(18.dp))
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(84.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable {
+                                if (userEmail == null) onLogout() else avatarPickerLauncher.launch("image/*")
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (avatarUrl != null) {
+                            AsyncImage(
+                                model = avatarUrl,
+                                contentDescription = "Foto Profil",
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_avatar_neutral),
+                                contentDescription = "Foto Profil",
+                                modifier = Modifier.size(76.dp).clip(CircleShape)
+                            )
+                        }
+                        if (isUploadingAvatar) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.4f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            }
+                        }
+                    }
+                    if (userEmail != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(OrangeAccent)
+                                .border(2.dp, Color.White, CircleShape)
+                                .clickable { avatarPickerLauncher.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = "Ubah Foto Profil", tint = OnAccentDark, modifier = Modifier.size(15.dp))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(userName, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (userEmail != null) "Dapoer Lavana Club" else "Silakan login terlebih dahulu",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.85f)
+                )
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -1711,84 +1826,27 @@ fun TabAkunDetail(
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp)
         ) {
-            // Profile Card (Cartoon Avatar + Guest/User Details)
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        if (userEmail == null) {
-                            onLogout() // redirect to login
-                        }
-                    },
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            if (userEmail != null) {
+                // No. HP Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_avatar_neutral),
-                            contentDescription = "Avatar Profile",
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = userName,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = DarkCharcoal
-                            )
-                            if (userEmail != null) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.clickable { showPhoneDialog = true }
-                                ) {
-                                    Text(
-                                        text = "No. HP: $currentPhone",
-                                        fontSize = 12.sp,
-                                        color = Color.Gray
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit Phone",
-                                        tint = OrangeJco,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                }
-                                Text(
-                                    text = "Dapoer Lavana Club",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OrangeJco,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = "Silakan login terlebih dahulu",
-                                    fontSize = 12.sp,
-                                    color = Color.Gray
-                                )
-                            }
-                        }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showPhoneDialog = true }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "No. HP: $currentPhone", fontSize = 13.sp, color = DarkCharcoal, fontWeight = FontWeight.Bold)
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Phone", tint = OrangeJco, modifier = Modifier.size(16.dp))
                     }
-
-                    Icon(
-                        imageVector = Icons.Default.ArrowForwardIos,
-                        contentDescription = "Detail",
-                        tint = Color.LightGray,
-                        modifier = Modifier.size(16.dp)
-                    )
                 }
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
             // Alamat Pengiriman Utama

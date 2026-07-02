@@ -2328,6 +2328,8 @@ fun TabAdminProfile(onLogout: () -> Unit) {
     var isSettingsLoading by remember { mutableStateOf(true) }
     var isRestaurantOpen by remember { mutableStateOf(true) }
     var isTogglingRestaurantOpen by remember { mutableStateOf(false) }
+    var adminContactInput by remember { mutableStateOf(CartManager.currentStaff?.contactNumber ?: "") }
+    var isSavingAdminContact by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
     var suggestions by remember { mutableStateOf<List<com.lavana.dapoer.data.SearchResult>>(emptyList()) }
@@ -2668,12 +2670,67 @@ fun TabAdminProfile(onLogout: () -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(20.dp))
-        Text("Admin Dapoer Lavana", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
-        Text("Email: admin@lavana.com", fontSize = 14.sp, color = Color.Gray)
-        Text("Level Akses: Owner / Administrator", fontSize = 12.sp, color = OrangeJco, fontWeight = FontWeight.Bold)
+        Text(CartManager.currentStaff?.name ?: "Admin Dapoer Lavana", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
+        Text("Username: ${CartManager.currentStaff?.username ?: "admin@lavana.com"}", fontSize = 14.sp, color = Color.Gray)
+        Text("Level Akses: ${CartManager.currentStaff?.role ?: "Owner / Administrator"}", fontSize = 12.sp, color = OrangeJco, fontWeight = FontWeight.Bold)
 
         if (!isSettingsLoading) {
             Spacer(modifier = Modifier.height(24.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                val contactContext = LocalContext.current
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Nomor HP/WA Admin", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = ForestGreen)
+                    Text("Dicetak di resi sebagai kontak yang bisa dihubungi pelanggan", fontSize = 11.sp, color = Color.Gray)
+                    OutlinedTextField(
+                        value = adminContactInput,
+                        onValueChange = { adminContactInput = it },
+                        placeholder = { Text("Contoh: 0812xxxxxxx") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Button(
+                        onClick = {
+                            val staffId = CartManager.currentStaff?.id
+                            if (staffId == null) {
+                                android.widget.Toast.makeText(contactContext, "Akun staff tidak ditemukan, silakan login ulang", android.widget.Toast.LENGTH_LONG).show()
+                            } else {
+                                isSavingAdminContact = true
+                                coroutineScope.launch {
+                                    try {
+                                        val newContact = adminContactInput.trim()
+                                        SupabaseClient.db["staff_accounts"].update({
+                                            set("contact_number", newContact)
+                                        }) { filter { eq("id", staffId) } }
+                                        CartManager.currentStaff = CartManager.currentStaff?.copy(contactNumber = newContact)
+                                        CartManager.currentStaff?.let { staff ->
+                                            val jsonStr = kotlinx.serialization.json.Json.encodeToString(StaffAccount.serializer(), staff)
+                                            contactContext.getSharedPreferences("lavana_prefs", android.content.Context.MODE_PRIVATE)
+                                                .edit().putString("logged_in_staff_json", jsonStr).apply()
+                                        }
+                                        android.widget.Toast.makeText(contactContext, "Nomor HP berhasil disimpan", android.widget.Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(contactContext, "Gagal menyimpan: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        isSavingAdminContact = false
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSavingAdminContact,
+                        colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+                    ) {
+                        Text(if (isSavingAdminContact) "Menyimpan..." else "Simpan Nomor HP", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),

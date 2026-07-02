@@ -758,6 +758,7 @@ fun AdminOrderCard(
 ) {
     var showRejectDialog by remember { mutableStateOf(false) }
     var rejectReasonInput by remember { mutableStateOf("") }
+    var showConfirmPaymentDialog by remember { mutableStateOf(false) }
     val assignedDriverName = remember(order.driverId, drivers) {
         drivers.find { it.id == order.driverId }?.name ?: "Belum Ditugaskan"
     }
@@ -813,6 +814,10 @@ fun AdminOrderCard(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
+            // Baris 1: aksi sekunder/info. Dipisah dari aksi status agar tidak berebut
+            // ruang horizontal -- sebelumnya semua tombol digabung 1 Row tanpa wrap,
+            // sehingga saat "Lihat Bukti Bayar" ikut tampil, tombol "Konfirmasi
+            // Pembayaran" terdorong keluar layar (tidak terlihat & tidak bisa ditekan).
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -843,43 +848,49 @@ fun AdminOrderCard(
                         Text("Lihat Bukti Bayar", color = OrangeJco, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.weight(1f))
-                when (order.status) {
-                    "Pending" -> {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (order.paymentStatus == "Menunggu Verifikasi") {
-                                Button(
-                                    onClick = { showRejectDialog = true },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.height(36.dp)
-                                ) {
-                                    Text("Tolak Pembayaran", fontSize = 12.sp, color = Color.White)
-                                }
-                            }
+            // Baris 2: aksi status pesanan -- SELALU baris sendiri, full width, terbagi
+            // rata (weight) agar tidak pernah terpotong berapa pun banyaknya tombol.
+            when (order.status) {
+                "Pending" -> {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (order.paymentStatus == "Menunggu Verifikasi") {
                             Button(
-                                onClick = onAccept,
-                                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                                onClick = { showRejectDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.height(36.dp)
+                                modifier = Modifier.height(36.dp).weight(1f)
                             ) {
-                                Text("Konfirmasi Pembayaran", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold)
+                                Text("Tolak Pembayaran", fontSize = 12.sp, color = Color.White)
                             }
                         }
-                    }
-                    "Diproses" -> {
                         Button(
-                            onClick = onAssignDriverClick,
+                            onClick = { showConfirmPaymentDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(36.dp)
+                            modifier = Modifier.height(36.dp).weight(1f)
                         ) {
-                            Text("Tugaskan Driver", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold)
+                            Text("Konfirmasi Pembayaran", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
                     }
-                    else -> {}
                 }
+                "Diproses" -> {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onAssignDriverClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(36.dp)
+                    ) {
+                        Text("Tugaskan Driver", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold)
+                    }
+                }
+                else -> {}
             }
         }
     }
@@ -917,6 +928,36 @@ fun AdminOrderCard(
             },
             dismissButton = {
                 TextButton(onClick = { showRejectDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Konfirmasi ulang sebelum menyetujui pembayaran -- mencegah tombol
+    // "Konfirmasi Pembayaran" tertekan tidak sengaja langsung memproses pesanan.
+    if (showConfirmPaymentDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmPaymentDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Konfirmasi Pembayaran", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Text("Yakin ingin mengonfirmasi pembayaran untuk Pesanan #${order.orderNumber}? Pesanan akan lanjut diproses untuk pengantaran.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConfirmPaymentDialog = false
+                        onAccept()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                ) {
+                    Text("Ya, Konfirmasi", color = OnAccentDark, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmPaymentDialog = false }) {
                     Text("Batal")
                 }
             }

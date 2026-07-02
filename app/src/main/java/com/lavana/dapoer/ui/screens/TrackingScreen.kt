@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TwoWheeler
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -437,18 +439,69 @@ fun TrackingScreen(
                                             .background(Color.White),
                                         contentScale = ContentScale.Fit
                                     )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    var isDownloadingQris by remember { mutableStateOf(false) }
+                                    val qrisDownloadScope = rememberCoroutineScope()
+                                    OutlinedButton(
+                                        onClick = {
+                                            if (!isDownloadingQris) {
+                                                isDownloadingQris = true
+                                                qrisDownloadScope.launch {
+                                                    val ok = downloadImageToGallery(context, displayQrisUrl, "QRIS_DapoerLavana_${System.currentTimeMillis()}.jpg")
+                                                    Toast.makeText(
+                                                        context,
+                                                        if (ok) "QRIS tersimpan ke Galeri. Buka aplikasi m-banking lalu pilih gambar ini untuk scan." else "Gagal mengunduh QRIS.",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                    isDownloadingQris = false
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
+                                        border = BorderStroke(1.dp, OrangeJco),
+                                        shape = RoundedCornerShape(8.dp),
+                                        enabled = !isDownloadingQris,
+                                        modifier = Modifier.height(36.dp)
+                                    ) {
+                                        if (isDownloadingQris) {
+                                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = OrangeJco)
+                                        } else {
+                                            Icon(Icons.Default.Download, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(16.dp))
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Unduh Gambar QRIS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    }
                                 } else {
                                     Text("Transfer Ke Rekening Resmi", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
                                     Spacer(modifier = Modifier.height(8.dp))
+                                    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                             Text("Bank:", fontSize = 11.sp, color = Color.Gray)
                                             Text(bankName, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = DarkCharcoal)
                                         }
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Text("Nomor Rekening:", fontSize = 11.sp, color = Color.Gray)
-                                            Text(bankNo, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = DarkCharcoal)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(bankNo, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = DarkCharcoal)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Icon(
+                                                    Icons.Default.ContentCopy,
+                                                    contentDescription = "Salin Nomor Rekening",
+                                                    tint = OrangeJco,
+                                                    modifier = Modifier
+                                                        .size(16.dp)
+                                                        .clickable {
+                                                            clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(bankNo))
+                                                            Toast.makeText(context, "Nomor rekening disalin!", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                )
+                                            }
                                         }
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -827,5 +880,33 @@ fun TrackingStepItem(
             Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = textCol)
             Text(time, fontSize = 11.sp, color = textCol.copy(alpha = 0.7f))
         }
+    }
+}
+
+// Unduh gambar dari URL (mis. QRIS) dan simpan ke Galeri (MediaStore.Images) agar
+// pelanggan bisa membukanya lewat aplikasi m-banking (fitur scan dari galeri).
+private suspend fun downloadImageToGallery(context: android.content.Context, imageUrl: String, filename: String): Boolean {
+    return try {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val bytes = java.net.URL(imageUrl).openStream().use { it.readBytes() }
+            val resolver = context.contentResolver
+            val contentValues = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES)
+                }
+            }
+            val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+            if (uri != null) {
+                resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                true
+            } else {
+                false
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
     }
 }

@@ -7,6 +7,10 @@
 
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Simpan gambar QRIS ke Galeri: hanya perlu izin eksplisit di Android <=9 (scoped storage
+         berlaku sejak Android 10/Q, insert MediaStore milik app sendiri tidak butuh izin lagi). -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />

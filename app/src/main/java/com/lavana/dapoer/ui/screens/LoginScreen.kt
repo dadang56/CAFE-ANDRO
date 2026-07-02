@@ -354,6 +354,7 @@ fun LoginScreen(
                                     }
 
                                     // 2. Check Supabase Auth for Customer (Pelanggan)
+                                    var authErrorMessage: String? = null
                                     if (!loginSuccess) {
                                         try {
                                             SupabaseClient.auth.signInWith(Email) {
@@ -367,7 +368,9 @@ fun LoginScreen(
                                             loginSuccess = true
                                             onNavigateToCustomer()
                                         } catch (authException: Exception) {
-                                            // Proceed to check local mock credentials
+                                            // Simpan pesan asli agar bisa ditampilkan bila SEMUA jalur login gagal
+                                            // (jangan ditelan diam-diam -- ini yang membuat diagnosa sulit sebelumnya).
+                                            authErrorMessage = authException.message
                                         }
                                     }
 
@@ -424,7 +427,13 @@ fun LoginScreen(
                                     }
 
                                     if (!loginSuccess) {
-                                        errorMessage = "Gagal Masuk: Kredensial tidak valid!"
+                                        errorMessage = when {
+                                            authErrorMessage?.contains("not confirmed", ignoreCase = true) == true ->
+                                                "Akun ini belum terkonfirmasi di server. Silahkan daftar ulang (nomor HP yang sama) untuk memperbaikinya."
+                                            authErrorMessage?.contains("Invalid login credentials", ignoreCase = true) == true ->
+                                                "Gagal Masuk: Nomor HP/Email atau sandi salah."
+                                            else -> "Gagal Masuk: Kredensial tidak valid!"
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     errorMessage = "Gagal Masuk: Masalah jaringan atau akun tidak terdaftar!"
@@ -673,18 +682,23 @@ fun LoginScreen(
                                 try {
                                     val phoneClean = regPhone.trim()
                                     val primaryEmail = "${phoneClean}@lavana.com"
-                                    
-                                    // Step 1. Supabase Auth Sign Up using Phone format
+
+                                    // Step 1. Supabase Auth Sign Up using Phone format.
+                                    // Catat hasil SEBENARNYA -- sebelumnya exception ditelan diam-diam dan
+                                    // pesan "Registrasi Berhasil!" selalu tampil meski akun server gagal
+                                    // dibuat, membuat akun itu tidak bisa login di device lain manapun.
+                                    var signUpError: String? = null
                                     try {
                                         SupabaseClient.auth.signUpWith(Email) {
                                             this.email = primaryEmail
                                             this.password = regPassword
                                         }
                                     } catch (signUpEx: Exception) {
-                                        // Ignore Auth error (e.g. offline/mock)
+                                        signUpError = signUpEx.message
                                     }
 
                                     // Save primary account details in SharedPreferences Backup
+                                    // (cadangan lokal, HANYA berlaku di device ini -- bukan pengganti akun server)
                                     val currentSet = sharedPref.getStringSet("registered_users", emptySet()) ?: emptySet()
                                     val newUsers = HashSet(currentSet)
                                     newUsers.add("$primaryEmail:$regPassword")
@@ -705,11 +719,17 @@ fun LoginScreen(
 
                                     sharedPref.edit().putStringSet("registered_users", newUsers).apply()
 
-                                    // Register success, go back to login screen pre-filled
                                     email = regPhone
                                     isRegisterScreen = false
-                                    errorMessage = "Registrasi Berhasil! Silahkan Masuk."
-                                    
+                                    errorMessage = if (signUpError == null) {
+                                        "Registrasi Berhasil! Silahkan Masuk."
+                                    } else if (signUpError.contains("already registered", ignoreCase = true) ||
+                                        signUpError.contains("already exists", ignoreCase = true)) {
+                                        "Nomor HP ini sudah terdaftar. Silahkan langsung Masuk."
+                                    } else {
+                                        "Registrasi tersimpan di perangkat ini, tapi akun server gagal dibuat ($signUpError). Login mungkin tidak berfungsi di perangkat lain."
+                                    }
+
                                     // Reset register states
                                     regPhone = ""
                                     regFullName = ""

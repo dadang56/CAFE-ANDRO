@@ -21,7 +21,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -49,7 +48,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.rotate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.RepeatMode
@@ -88,30 +86,13 @@ fun LoginScreen(
     val sharedPref = remember(context) { context.getSharedPreferences("lavana_prefs", Context.MODE_PRIVATE) }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(LightGrayJco)
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Watermark halus agar area kosong tidak terlalu polos
         Image(
-            painter = painterResource(id = R.drawable.wm_wheat),
+            painter = painterResource(id = R.drawable.bg_teal_leaf),
             contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 10.dp, bottom = 28.dp)
-                .size(150.dp)
-                .rotate(-18f),
-            alpha = 0.06f
-        )
-        Image(
-            painter = painterResource(id = R.drawable.wm_rice),
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 14.dp, bottom = 96.dp)
-                .size(120.dp)
-                .rotate(18f),
-            alpha = 0.06f
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
         Column(
             modifier = Modifier
@@ -134,12 +115,9 @@ fun LoginScreen(
                 )
             }
 
-            // ==================== TEAL GRADIENT TOP REGION (shared) ====================
+            // ==================== TOP HERO REGION (background gambar bersama) ====================
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                    .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                modifier = Modifier.fillMaxWidth()
             ) {
                 // Back button overlaid on the gradient (soft translucent chip for contrast)
                 IconButton(

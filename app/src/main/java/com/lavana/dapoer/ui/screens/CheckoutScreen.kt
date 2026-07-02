@@ -97,29 +97,19 @@ fun CheckoutScreen(
             containerColor = LightGrayJco
         ) { innerPadding ->
             Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                // Watermark dekoratif halus di area kosong (di belakang konten)
                 Image(
-                    painter = painterResource(R.drawable.wm_wheat),
+                    painter = painterResource(R.drawable.bg_teal_leaf),
                     contentDescription = null,
-                    modifier = Modifier
-                        .size(150.dp)
-                        .rotate(-20f)
-                        .align(Alignment.TopStart),
-                    alpha = 0.06f
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
-                Image(
-                    painter = painterResource(R.drawable.wm_rice),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(160.dp)
-                        .rotate(15f)
-                        .align(Alignment.BottomEnd),
-                    alpha = 0.06f
-                )
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.padding(innerPadding).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Box(
                         modifier = Modifier
                             .size(110.dp)

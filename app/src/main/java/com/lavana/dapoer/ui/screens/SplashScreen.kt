@@ -10,14 +10,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,18 +23,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.lavana.dapoer.R
-import com.lavana.dapoer.ui.theme.ForestGreen
 import com.lavana.dapoer.ui.theme.OrangeAccent
-import com.lavana.dapoer.ui.theme.OrangeJco
 import kotlinx.coroutines.delay
 
 @Composable
@@ -74,29 +67,14 @@ fun SplashScreen(onAnimationFinished: () -> Unit) {
     )
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen))),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Aksen lingkaran lembut (offset agar boleh keluar tepi — bukan padding negatif).
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = 60.dp, y = (-50).dp)
-                .height(200.dp)
-                .fillMaxWidth(0.55f)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.06f))
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .offset(x = (-50).dp, y = 60.dp)
-                .height(180.dp)
-                .fillMaxWidth(0.5f)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.05f))
+        Image(
+            painter = painterResource(id = R.drawable.bg_teal_leaf),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
 
         Image(

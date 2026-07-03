@@ -17,6 +17,14 @@ data class MenuItem(
 )
 
 @Serializable
+data class FcmToken(
+    val id: String? = null,
+    @SerialName("owner_id") val ownerId: String,
+    val role: String, // 'Customer', 'Admin', 'Driver'
+    val token: String
+)
+
+@Serializable
 data class Promo(
     val id: String? = null,
     val code: String,

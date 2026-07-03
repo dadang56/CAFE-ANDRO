@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "973434840587",
+    "project_id": "dapoer-lavana",
+    "storage_bucket": "dapoer-lavana.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:973434840587:android:c2e5e1b8be6784c214c90e",
+        "android_client_info": {
+          "package_name": "com.lavana.dapoer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCD25bwI9AOwZjTHUHGjFnmY2sJiMorVnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -37,6 +37,7 @@ import com.lavana.dapoer.R
 import com.lavana.dapoer.data.CartManager
 import com.lavana.dapoer.data.StaffAccount
 import com.lavana.dapoer.data.SupabaseClient
+import com.lavana.dapoer.data.registerCurrentFcmToken
 import com.lavana.dapoer.ui.theme.*
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
@@ -440,6 +441,8 @@ fun LoginScreen(
                                                 "Gagal Masuk: Nomor HP/Email atau sandi salah."
                                             else -> "Gagal Masuk: Kredensial tidak valid!"
                                         }
+                                    } else {
+                                        registerCurrentFcmToken(context)
                                     }
                                 } catch (e: Exception) {
                                     errorMessage = "Gagal Masuk: Masalah jaringan atau akun tidak terdaftar!"

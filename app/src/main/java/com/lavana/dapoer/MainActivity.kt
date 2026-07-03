@@ -77,7 +77,23 @@ fun DapoerLavanaAppNavigation() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val sharedPref = remember(context) { context.getSharedPreferences("lavana_prefs", android.content.Context.MODE_PRIVATE) }
-    
+
+    // Android 13+ mewajibkan izin runtime agar notifikasi (FCM) benar-benar tampil,
+    // tanpa ini NotificationManager.notify() gagal diam-diam (SecurityException).
+    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { /* diabaikan jika ditolak -- app tetap jalan tanpa notifikasi */ }
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
     var showUpdateDialog by remember { mutableStateOf(false) }
     var latestVersionName by remember { mutableStateOf("") }
     var updateDescription by remember { mutableStateOf("") }
@@ -115,6 +131,7 @@ fun DapoerLavanaAppNavigation() {
                         com.lavana.dapoer.data.CartManager.currentStaff = staff
                     }
                 }
+                com.lavana.dapoer.data.registerCurrentFcmToken(context)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -317,6 +334,7 @@ fun DapoerLavanaAppNavigation() {
     }
 
     val clearSession = {
+        com.lavana.dapoer.data.unregisterCurrentFcmToken()
         sharedPref.edit()
             .remove("logged_in_user_id")
             .remove("logged_in_user_email")

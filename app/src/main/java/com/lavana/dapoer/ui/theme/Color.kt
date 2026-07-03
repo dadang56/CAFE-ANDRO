@@ -16,9 +16,12 @@ val ForestGreen = Color(0xFF0E6973)     // Teal Dark (#0E6973, akhir gradient, j
 val TealDark = ForestGreen
 
 // --- Aksen kuning: KHUSUS tombol CTA utama & highlight ---
-val OrangeAccent = Color(0xFFF2BB16)    // Login, Pesan, Tambah, +, Favorit aktif (#F2BB16)
+val OrangeAccent = Color(0xFFF2BB16)    // Login, Pesan, Tambah, + (#F2BB16)
 val OnAccentDark = Color(0xFF3A2A06)    // teks gelap di atas kuning (kontras, bukan dari palet)
 val Mustard = Color(0xFFBF820F)         // aksen amber sekunder (#BF820F)
+
+// --- Aksen merah: KHUSUS label "Promo" & ikon Favorit (hati) aktif ---
+val PromoRed = Color(0xFFD93521)
 
 // --- Latar & permukaan ---
 val LightGrayJco = Color(0xFFBAD9CE)    // Mint background (latar layar, #BAD9CE)

@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -61,9 +62,11 @@ fun AdminScreen(
     Scaffold(
         bottomBar = {
             NavigationBar(
-                modifier = Modifier.clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
+                modifier = Modifier
+                    .shadow(10.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
                 containerColor = Color.White,
-                tonalElevation = 8.dp
+                tonalElevation = 0.dp
             ) {
                 NavigationBarItem(
                     selected = currentTab == 0,

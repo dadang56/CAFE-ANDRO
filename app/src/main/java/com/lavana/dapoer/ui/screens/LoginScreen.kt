@@ -248,7 +248,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        placeholder = { Text("Kata Sandi", color = Color.LightGray) },
+                        placeholder = { Text("Password", color = Color.LightGray) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -591,7 +591,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = regPassword,
                         onValueChange = { regPassword = it },
-                        placeholder = { Text("Kata Sandi", color = Color.LightGray) },
+                        placeholder = { Text("Password", color = Color.LightGray) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         visualTransformation = if (regPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),

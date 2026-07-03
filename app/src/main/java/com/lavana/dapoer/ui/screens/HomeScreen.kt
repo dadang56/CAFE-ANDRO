@@ -345,6 +345,9 @@ fun TabBeranda(
             "Guest"
         }
     }
+    val avatarUrl = remember(userEmail) {
+        if (userEmail != null) sharedPref.getString("avatar_$userEmail", null) else null
+    }
 
     val filteredItems = remember(displayMenu, selectedCategory) {
         if (selectedCategory == "All") {
@@ -457,15 +460,27 @@ fun TabBeranda(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .background(Color.White.copy(alpha = 0.18f), CircleShape),
+                        .background(Color.White.copy(alpha = 0.18f), CircleShape)
+                        .border(1.5.dp, Color.White.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
-                    )
+                    if (avatarUrl != null) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = "Foto Profil",
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
                 }
             }
         }
@@ -818,8 +833,8 @@ fun TabBeranda(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         rowItems.forEach { item ->
                             Box(modifier = Modifier.weight(1f)) {
@@ -885,7 +900,7 @@ fun JcoProductCard(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(108.dp)
+                            .height(96.dp)
                             .graphicsLayer { this.alpha = if (item.isAvailable) 1f else 0.5f }
                     )
                     if (!item.isAvailable) {
@@ -907,7 +922,7 @@ fun JcoProductCard(
 
                 Column(
                     modifier = Modifier
-                        .padding(horizontal = 10.dp, vertical = 10.dp)
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
                         .graphicsLayer { this.alpha = if (item.isAvailable) 1f else 0.6f }
                 ) {
                     // Item Title
@@ -946,7 +961,7 @@ fun JcoProductCard(
                         color = OrangeJco
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Add quantity / Cart action
                     if (!item.isAvailable) {
@@ -1022,7 +1037,7 @@ fun JcoProductCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(topStart = 18.dp, bottomEnd = 10.dp))
-                        .background(RedPromo)
+                        .background(PromoRed)
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
@@ -1047,7 +1062,7 @@ fun JcoProductCard(
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = "Favorite",
-                    tint = if (isFavorite) OrangeAccent else Color.Gray,
+                    tint = if (isFavorite) PromoRed else Color.Gray,
                     modifier = Modifier.size(14.dp)
                 )
             }
@@ -2441,7 +2456,7 @@ fun JcoBottomNavigation(
                 label = "Favorit",
                 icon = if (currentTab == 2) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 isSelected = currentTab == 2,
-                selectedColor = OrangeAccent,
+                selectedColor = PromoRed,
                 onClick = { onTabSelected(2) }
             )
             JcoBottomTabItem(

@@ -18,7 +18,7 @@ data class CartItem(
 
 object CartManager {
     val items = mutableStateListOf<CartItem>()
-    var selectedOrderType by mutableStateOf<String?>("Delivery")
+    var selectedOrderType by mutableStateOf<String?>(null)
     var currentStaff by mutableStateOf<StaffAccount?>(null)
     val simulatedDriverLocations = mutableStateMapOf<String, LatLng>()
     

@@ -12,12 +12,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,7 +34,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.lavana.dapoer.R
 import com.lavana.dapoer.ui.theme.ForestGreen
 import com.lavana.dapoer.ui.theme.OrangeAccent
@@ -101,17 +105,28 @@ fun SplashScreen(onAnimationFinished: () -> Unit) {
             alpha = 0.08f
         )
 
-        Image(
-            painter = painterResource(id = R.drawable.logo_lavana),
-            contentDescription = "Logo Dapoer Lavana",
-            modifier = Modifier
-                .fillMaxWidth(0.62f)
-                .height(150.dp)
-                .alpha(alpha.value)
-                .scale(scale.value * breath),
-            contentScale = ContentScale.Fit,
-            colorFilter = ColorFilter.tint(Color.White)
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.alpha(alpha.value)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo_lavana),
+                contentDescription = "Logo Dapoer Lavana",
+                modifier = Modifier
+                    .fillMaxWidth(0.62f)
+                    .height(150.dp)
+                    .scale(scale.value * breath),
+                contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.tint(Color.White)
+            )
+            Text(
+                text = "WARKOP  •  RASA  •  CERITA",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp,
+                color = Color.White.copy(alpha = 0.85f)
+            )
+        }
 
         Box(
             modifier = Modifier

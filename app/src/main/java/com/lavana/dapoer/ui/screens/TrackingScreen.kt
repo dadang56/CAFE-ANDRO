@@ -80,6 +80,15 @@ fun TrackingScreen(
     var isUploadingPayment by remember { mutableStateOf(false) }
     var uploadError by remember { mutableStateOf<String?>(null) }
     var showThankYouDialog by remember { mutableStateOf(false) }
+    var showAbandonWarning by remember { mutableStateOf(false) }
+
+    fun handleBackNavigation() {
+        if (order?.status == "Pending" && order?.paymentStatus == "Belum Bayar") {
+            showAbandonWarning = true
+        } else {
+            onNavigateHome()
+        }
+    }
 
     fun loadOrder() {
         coroutineScope.launch {
@@ -258,12 +267,58 @@ fun TrackingScreen(
         LatLng(-6.2297, 106.8296) // Cafe location fallback
     }
 
+    androidx.activity.compose.BackHandler {
+        handleBackNavigation()
+    }
+
+    if (showAbandonWarning) {
+        AlertDialog(
+            onDismissRequest = { showAbandonWarning = false },
+            title = { Text("Pesanan Belum Dikonfirmasi", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Text(
+                    "Kamu belum konfirmasi pembayaran. Jika kembali sekarang, pesanan ini akan dianggap batal dan tidak akan diproses admin.",
+                    color = DarkCharcoal.copy(alpha = 0.75f)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val oid = order?.id
+                        if (oid != null) {
+                            coroutineScope.launch {
+                                try {
+                                    SupabaseClient.db["orders"].update({
+                                        set("status", "Dibatalkan")
+                                        set("notes", "Dibatalkan otomatis: keluar sebelum konfirmasi pembayaran")
+                                    }) { filter { eq("id", oid) } }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+                        showAbandonWarning = false
+                        onNavigateHome()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RedPromo)
+                ) {
+                    Text("Batalkan & Kembali", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAbandonWarning = false }) {
+                    Text("Lanjut Konfirmasi", color = OrangeJco)
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Lacak Pesanan", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateHome) {
+                    IconButton(onClick = { handleBackNavigation() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Kembali ke Beranda", tint = DarkCharcoal)
                     }
                 },
@@ -678,10 +733,16 @@ fun TrackingScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    TrackingStepItem(stepNumber = 1, title = "Pesanan Diterima", time = "10:15 WIB", isActive = activeStep >= 1)
-                    TrackingStepItem(stepNumber = 2, title = "Sedang Disiapkan di Dapur", time = "10:25 WIB", isActive = activeStep >= 2)
-                    TrackingStepItem(stepNumber = 3, title = "Sedang Dalam Pengiriman", time = "10:40 WIB", isActive = activeStep >= 3)
-                    TrackingStepItem(stepNumber = 4, title = "Sampai di Lokasi Anda", time = "Menunggu", isActive = activeStep >= 4, isLast = true)
+                    if (orderType == "Dine In") {
+                        // Dine In tidak butuh linimasa pengiriman -- cukup diterima lalu selesai.
+                        TrackingStepItem(stepNumber = 1, title = "Pesanan Diterima", time = "10:15 WIB", isActive = activeStep >= 1)
+                        TrackingStepItem(stepNumber = 2, title = "Selesai Disajikan", time = "Menunggu", isActive = activeStep >= 4, isLast = true)
+                    } else {
+                        TrackingStepItem(stepNumber = 1, title = "Pesanan Diterima", time = "10:15 WIB", isActive = activeStep >= 1)
+                        TrackingStepItem(stepNumber = 2, title = "Sedang Disiapkan di Dapur", time = "10:25 WIB", isActive = activeStep >= 2)
+                        TrackingStepItem(stepNumber = 3, title = "Sedang Dalam Pengiriman", time = "10:40 WIB", isActive = activeStep >= 3)
+                        TrackingStepItem(stepNumber = 4, title = "Sampai di Lokasi Anda", time = "Menunggu", isActive = activeStep >= 4, isLast = true)
+                    }
                 }
             }
             

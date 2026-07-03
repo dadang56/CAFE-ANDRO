@@ -324,7 +324,6 @@ fun CheckoutScreen(
     val subtotal = CartManager.getTotalPrice()
     val totalPayment = if (orderType == "Delivery") subtotal + deliveryFee else subtotal
     
-    var tableNumberInput by remember { mutableStateOf("Meja Nomor 05") }
     var selectedPayment by remember { mutableStateOf("QRIS") }
     var uploadedFileName by remember { mutableStateOf<String?>(null) }
 
@@ -404,7 +403,6 @@ fun CheckoutScreen(
                                         userId = currentUserId,
                                         orderType = orderType,
                                         status = "Pending",
-                                        tableNumber = if (orderType == "Dine In") tableNumberInput else null,
                                         deliveryAddress = if (orderType == "Delivery") addressInput else null,
                                         deliveryDistanceKm = if (orderType == "Delivery") distanceKm else null,
                                         deliveryFee = if (orderType == "Delivery") deliveryFee else 0.0,
@@ -739,39 +737,24 @@ fun CheckoutScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        if (orderType == "Dine In") {
-                            Text("Nomor Meja", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = tableNumberInput,
-                                onValueChange = { tableNumberInput = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = OrangeJco,
-                                    unfocusedBorderColor = Color.LightGray
-                                )
+                        Text("Alamat Lengkap", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Pastikan alamat sesuai dengan titik pada peta",
+                            fontSize = 11.sp,
+                            color = DarkCharcoal.copy(alpha = 0.55f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = addressInput,
+                            onValueChange = { addressInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = OrangeJco,
+                                unfocusedBorderColor = Color.LightGray
                             )
-                        } else {
-                            Text("Alamat Lengkap", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 14.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Pastikan alamat sesuai dengan titik pada peta",
-                                fontSize = 11.sp,
-                                color = DarkCharcoal.copy(alpha = 0.55f)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = addressInput,
-                                onValueChange = { addressInput = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = OrangeJco,
-                                    unfocusedBorderColor = Color.LightGray
-                                )
-                            )
-                        }
+                        )
                     }
                 }
 

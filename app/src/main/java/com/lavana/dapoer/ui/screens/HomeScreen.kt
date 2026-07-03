@@ -127,9 +127,6 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (CartManager.selectedOrderType == null) {
-            CartManager.selectedOrderType = "Delivery"
-        }
         isLoadingMenu = true
         try {
             menuList = SupabaseClient.initializeMenuIfEmpty()
@@ -459,9 +456,9 @@ fun TabBeranda(
                 }
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(68.dp)
                         .background(Color.White.copy(alpha = 0.18f), CircleShape)
-                        .border(1.5.dp, Color.White.copy(alpha = 0.7f), CircleShape),
+                        .border(2.dp, Color.White.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (avatarUrl != null) {
@@ -469,7 +466,7 @@ fun TabBeranda(
                             model = avatarUrl,
                             contentDescription = "Foto Profil",
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(62.dp)
                                 .clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
@@ -478,11 +475,50 @@ fun TabBeranda(
                             imageVector = Icons.Default.Person,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(34.dp)
                         )
                     }
                 }
             }
+        }
+
+        // Wajib pilih Delivery/Dine In dulu sebelum mulai memesan -- sebelumnya
+        // selectedOrderType diam-diam di-default ke "Delivery" tanpa pelanggan sadar.
+        if (CartManager.selectedOrderType == null) {
+            AlertDialog(
+                onDismissRequest = { /* wajib memilih salah satu, tidak bisa ditutup begitu saja */ },
+                title = { Text("Mau Pesan Dengan Cara Apa?", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+                text = {
+                    Column {
+                        Text(
+                            "Pilih dulu tipe pesananmu sebelum mulai memilih menu.",
+                            color = DarkCharcoal.copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { CartManager.selectedOrderType = "Delivery" },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeJco),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.DeliveryDining, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Delivery", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = { CartManager.selectedOrderType = "Dine In" },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
+                            border = BorderStroke(1.dp, OrangeJco),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Restaurant, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Dine In", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                confirmButton = {}
+            )
         }
 
         // Pilihan Tipe Order: Delivery / Dine In
@@ -2480,15 +2516,22 @@ fun JcoBottomTabItem(
     Column(
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            modifier = Modifier.size(24.dp),
-            tint = if (isSelected) selectedColor else Color.Gray
-        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (isSelected) LightOrangeJco else Color.Transparent)
+                .padding(horizontal = 18.dp, vertical = 4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(24.dp),
+                tint = if (isSelected) selectedColor else Color.Gray
+            )
+        }
         Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label,

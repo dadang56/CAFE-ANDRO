@@ -185,6 +185,14 @@ fun LoginScreen(
                             colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
                         )
                     }
+                    Text(
+                        text = "WARKOP  •  RASA  •  CERITA",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 1.sp,
+                        color = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.alpha(logoAlpha.value)
+                    )
                 }
             }
 

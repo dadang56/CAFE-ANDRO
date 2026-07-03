@@ -783,6 +783,13 @@ fun TabAdminOrders() {
                                 colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black),
                                 modifier = Modifier.height(48.dp)
                             )
+                            Text(
+                                text = "Warkop . Rasa . Cerita",
+                                fontSize = 8.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "Terima Kasih Atas Kunjungan Anda",
@@ -909,9 +916,33 @@ fun AdminOrderCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            if (order.orderType == "Dine In") {
-                Text("No. Meja: ${order.tableNumber ?: "-"}", fontSize = 12.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            } else {
+            val isDineIn = order.orderType == "Dine In"
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isDineIn) LightOrangeJco else Color(0xFFDCEFFB))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (isDineIn) Icons.Default.Restaurant else Icons.Default.DeliveryDining,
+                            contentDescription = null,
+                            tint = if (isDineIn) OrangeJco else Color(0xFF2563EB),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = order.orderType,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDineIn) OrangeJco else Color(0xFF2563EB)
+                        )
+                    }
+                }
+            }
+            if (!isDineIn) {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text("Alamat: ${order.deliveryAddress ?: "-"}", fontSize = 12.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text("Total: Rp ${String.format("%,.0f", order.total)} | Pembayaran: ${order.paymentMethod} (${order.paymentStatus})", fontSize = 12.sp, color = Color.Gray)
@@ -4014,6 +4045,7 @@ fun buildOrderReceiptElements(
     } catch (e: Exception) {
         e.printStackTrace()
     }
+    elements.add(ReceiptElement.TextLine("Warkop . Rasa . Cerita", align = ReceiptAlign.CENTER))
     elements.add(ReceiptElement.TextLine("Terima Kasih Atas Kunjungan Anda", align = ReceiptAlign.CENTER))
 
     return elements

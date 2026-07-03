@@ -3,7 +3,7 @@
     android:height="120dp"
     android:viewportWidth="100"
     android:viewportHeight="100"
-    android:tint="#13807A">
+    android:tint="#0E6973">
     <!-- Batang gandum -->
     <path
         android:strokeColor="#FFFFFF"

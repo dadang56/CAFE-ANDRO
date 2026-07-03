@@ -101,10 +101,22 @@ fun CheckoutScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(R.drawable.bg_teal_leaf),
+                    painter = painterResource(R.drawable.wm_wheat),
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    modifier = Modifier
+                        .size(150.dp)
+                        .rotate(-20f)
+                        .align(Alignment.TopStart),
+                    alpha = 0.10f
+                )
+                Image(
+                    painter = painterResource(R.drawable.wm_rice),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(160.dp)
+                        .rotate(15f)
+                        .align(Alignment.BottomEnd),
+                    alpha = 0.10f
                 )
                 Column(
                     modifier = Modifier.padding(innerPadding).padding(24.dp),

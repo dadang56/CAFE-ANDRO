@@ -36,7 +36,8 @@ data class CustomerProfile(
 data class BannerItem(
     val id: String? = null,
     @SerialName("image_url") val imageUrl: String,
-    val title: String? = ""
+    val title: String? = "",
+    @SerialName("linked_menu_item_id") val linkedMenuItemId: String? = null
 )
 
 

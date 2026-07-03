@@ -61,6 +61,7 @@ fun AdminScreen(
     Scaffold(
         bottomBar = {
             NavigationBar(
+                modifier = Modifier.clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
                 containerColor = Color.White,
                 tonalElevation = 8.dp
             ) {
@@ -905,7 +906,11 @@ fun AdminOrderCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Alamat: ${order.deliveryAddress ?: "-"}", fontSize = 12.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (order.orderType == "Dine In") {
+                Text("No. Meja: ${order.tableNumber ?: "-"}", fontSize = 12.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            } else {
+                Text("Alamat: ${order.deliveryAddress ?: "-"}", fontSize = 12.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             Text("Total: Rp ${String.format("%,.0f", order.total)} | Pembayaran: ${order.paymentMethod} (${order.paymentStatus})", fontSize = 12.sp, color = Color.Gray)
             
             if (order.status == "Diantar" || order.status == "Selesai") {
@@ -1611,6 +1616,7 @@ fun AddOrEditMenuDialog(
 // ==========================================================
 // TABS 2: PROMOTION BANNERS
 // ==========================================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TabAdminBanners() {
     val coroutineScope = rememberCoroutineScope()
@@ -1620,6 +1626,12 @@ fun TabAdminBanners() {
     var imageUrlInput by remember { mutableStateOf("") }
     var titleInput by remember { mutableStateOf("") }
     var isUploadingPhoto by remember { mutableStateOf(false) }
+    var menuItemsList by remember { mutableStateOf<List<MenuItem>>(emptyList()) }
+    var linkedMenuForNewBanner by remember { mutableStateOf<MenuItem?>(null) }
+    var showMenuPickerFor by remember { mutableStateOf<String?>(null) } // "new" atau id banner yang sedang diedit linknya
+    var hotPromoTitleInput by remember { mutableStateOf("Hot Promo") }
+    var hotPromoSubtitleInput by remember { mutableStateOf("Penawaran spesial untukmu") }
+    var isSavingHotPromoText by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -1681,6 +1693,14 @@ fun TabAdminBanners() {
 
     LaunchedEffect(Unit) {
         loadBanners()
+        try {
+            menuItemsList = SupabaseClient.db["menu_items"].select().decodeList<MenuItem>()
+        } catch (e: Exception) {}
+        try {
+            val settingsList = SupabaseClient.db["settings"].select().decodeList<SettingsRow>()
+            settingsList.find { it.key == "hot_promo_title" }?.description?.let { if (it.isNotBlank()) hotPromoTitleInput = it }
+            settingsList.find { it.key == "hot_promo_subtitle" }?.description?.let { if (it.isNotBlank()) hotPromoSubtitleInput = it }
+        } catch (e: Exception) {}
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -1704,6 +1724,60 @@ fun TabAdminBanners() {
         }
 
         Column(modifier = Modifier.weight(1f).padding(16.dp)) {
+
+        // Judul & Subjudul "Hot Promo" di beranda pelanggan
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Judul Hot Promo", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkCharcoal)
+                Text("Tampil di atas carousel banner beranda pelanggan", fontSize = 11.sp, color = Color.Gray)
+                OutlinedTextField(
+                    value = hotPromoTitleInput,
+                    onValueChange = { hotPromoTitleInput = it },
+                    label = { Text("Judul") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = hotPromoSubtitleInput,
+                    onValueChange = { hotPromoSubtitleInput = it },
+                    label = { Text("Subjudul") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Button(
+                    onClick = {
+                        isSavingHotPromoText = true
+                        coroutineScope.launch {
+                            try {
+                                SupabaseClient.db["settings"].update({
+                                    set("description", hotPromoTitleInput)
+                                }) { filter { eq("key", "hot_promo_title") } }
+                                SupabaseClient.db["settings"].update({
+                                    set("description", hotPromoSubtitleInput)
+                                }) { filter { eq("key", "hot_promo_subtitle") } }
+                                android.widget.Toast.makeText(context, "Judul Hot Promo tersimpan", android.widget.Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "Gagal menyimpan: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                            } finally {
+                                isSavingHotPromoText = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSavingHotPromoText,
+                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+                ) {
+                    Text(if (isSavingHotPromoText) "Menyimpan..." else "Simpan Judul", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Form Tambah Banner
         Card(
@@ -1767,6 +1841,43 @@ fun TabAdminBanners() {
                     }
                 }
 
+                // Koneksi banner ke menu: saat pelanggan tap banner, menu ini akan ditampilkan
+                var menuDropdownExpanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = menuDropdownExpanded,
+                    onExpandedChange = { menuDropdownExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = linkedMenuForNewBanner?.name ?: "Tidak terhubung ke menu",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Hubungkan ke Menu (opsional)") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuDropdownExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = menuDropdownExpanded,
+                        onDismissRequest = { menuDropdownExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Tidak terhubung ke menu") },
+                            onClick = {
+                                linkedMenuForNewBanner = null
+                                menuDropdownExpanded = false
+                            }
+                        )
+                        menuItemsList.forEach { menu ->
+                            DropdownMenuItem(
+                                text = { Text(menu.name) },
+                                onClick = {
+                                    linkedMenuForNewBanner = menu
+                                    menuDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 Button(
                     onClick = {
                         if (imageUrlInput.isNotBlank()) {
@@ -1775,11 +1886,13 @@ fun TabAdminBanners() {
                                     val newBanner = BannerItem(
                                         id = UUID.randomUUID().toString(),
                                         imageUrl = imageUrlInput,
-                                        title = titleInput
+                                        title = titleInput,
+                                        linkedMenuItemId = linkedMenuForNewBanner?.id
                                     )
                                     SupabaseClient.db["banners"].insert(newBanner)
                                     imageUrlInput = ""
                                     titleInput = ""
+                                    linkedMenuForNewBanner = null
                                     loadBanners()
                                 } catch (e: Exception) {}
                             }
@@ -1849,6 +1962,16 @@ fun TabAdminBanners() {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(banner.title ?: "Promo Spesial", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal)
                                 Text(banner.imageUrl, fontSize = 10.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val linkedName = menuItemsList.find { it.id == banner.linkedMenuItemId }?.name
+                                Text(
+                                    if (linkedName != null) "Terhubung: $linkedName" else "Belum terhubung ke menu",
+                                    fontSize = 10.sp,
+                                    color = if (linkedName != null) ForestGreen else Color.Gray,
+                                    fontWeight = if (linkedName != null) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                            IconButton(onClick = { showMenuPickerFor = banner.id }) {
+                                Icon(Icons.Default.Link, contentDescription = "Hubungkan ke Menu", tint = OrangeJco)
                             }
                             IconButton(onClick = {
                                 coroutineScope.launch {
@@ -1868,6 +1991,71 @@ fun TabAdminBanners() {
             }
         }
         }
+    }
+
+    if (showMenuPickerFor != null) {
+        val editingBanner = banners.find { it.id == showMenuPickerFor }
+        AlertDialog(
+            onDismissRequest = { showMenuPickerFor = null },
+            title = { Text("Hubungkan Banner ke Menu", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 350.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        "Tidak terhubung ke menu",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                                coroutineScope.launch {
+                                    try {
+                                        SupabaseClient.db["banners"].update({
+                                            set("linked_menu_item_id", null as String?)
+                                        }) { filter { eq("id", editingBanner?.id ?: "") } }
+                                        loadBanners()
+                                    } catch (e: Exception) {}
+                                    showMenuPickerFor = null
+                                }
+                            }
+                            .padding(12.dp),
+                        fontSize = 13.sp,
+                        color = if (editingBanner?.linkedMenuItemId == null) OrangeJco else DarkCharcoal,
+                        fontWeight = if (editingBanner?.linkedMenuItemId == null) FontWeight.Bold else FontWeight.Normal
+                    )
+                    menuItemsList.forEach { menu ->
+                        val selected = editingBanner?.linkedMenuItemId == menu.id
+                        Text(
+                            menu.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    coroutineScope.launch {
+                                        try {
+                                            SupabaseClient.db["banners"].update({
+                                                set("linked_menu_item_id", menu.id)
+                                            }) { filter { eq("id", editingBanner?.id ?: "") } }
+                                            loadBanners()
+                                        } catch (e: Exception) {}
+                                        showMenuPickerFor = null
+                                    }
+                                }
+                                .padding(12.dp),
+                            fontSize = 13.sp,
+                            color = if (selected) OrangeJco else DarkCharcoal,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMenuPickerFor = null }) {
+                    Text("Tutup", color = Color.Gray)
+                }
+            }
+        )
     }
 }
 

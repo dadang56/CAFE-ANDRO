@@ -44,6 +44,7 @@ fun DriverScreen(
     Scaffold(
         bottomBar = {
             NavigationBar(
+                modifier = Modifier.clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
                 containerColor = Color.White,
                 tonalElevation = 8.dp
             ) {

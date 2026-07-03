@@ -3,28 +3,27 @@ package com.lavana.dapoer.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ============================================================
-// Palet "Teal Fresh" — diselaraskan dengan desain referensi.
+// Palet "Lemon Teal" — kode warna yang diberikan user (2026-07-02):
+// #0E6973, #118C8C, #BAD9CE, #F2BB16, #BF820F.
 // CATATAN: nama token lama DIPERTAHANKAN agar tidak perlu refactor
 // 200+ pemakaian di seluruh kode; hanya NILAINYA yang direvaluasi.
-// "OrangeJco" sekarang = Teal (bukan oranye/sage). Untuk tombol CTA
-// gunakan token baru OrangeAccent.
 // ============================================================
 
 // --- Brand utama (header, ikon, harga, elemen terpilih) ---
-val OrangeJco = Color(0xFF13807A)       // Teal Primary
+val OrangeJco = Color(0xFF118C8C)       // Teal Primary (#118C8C)
 val TealPrimary = OrangeJco
-val ForestGreen = Color(0xFF0B524E)     // Teal Dark (akhir gradient, judul gelap)
+val ForestGreen = Color(0xFF0E6973)     // Teal Dark (#0E6973, akhir gradient, judul gelap)
 val TealDark = ForestGreen
 
-// --- Aksen oranye: KHUSUS tombol CTA utama & highlight ---
-val OrangeAccent = Color(0xFFF4A82C)    // Login, Pesan, Tambah, +, Favorit aktif
-val OnAccentDark = Color(0xFF3A2A06)    // teks gelap di atas oranye
-val Mustard = OrangeAccent              // kompatibilitas nama lama
+// --- Aksen kuning: KHUSUS tombol CTA utama & highlight ---
+val OrangeAccent = Color(0xFFF2BB16)    // Login, Pesan, Tambah, +, Favorit aktif (#F2BB16)
+val OnAccentDark = Color(0xFF3A2A06)    // teks gelap di atas kuning (kontras, bukan dari palet)
+val Mustard = Color(0xFFBF820F)         // aksen amber sekunder (#BF820F)
 
 // --- Latar & permukaan ---
-val LightGrayJco = Color(0xFFEAF4EE)    // Mint background (latar layar)
+val LightGrayJco = Color(0xFFBAD9CE)    // Mint background (latar layar, #BAD9CE)
 val MintBg = LightGrayJco
-val LightOrangeJco = Color(0xFFD8EAE3)  // Soft teal tint (indikator/bg lembut)
+val LightOrangeJco = Color(0xFFCFE8E8)  // Soft teal tint (indikator/bg lembut, turunan #118C8C)
 val White = Color(0xFFFFFFFF)
 val Black = Color(0xFF000000)
 

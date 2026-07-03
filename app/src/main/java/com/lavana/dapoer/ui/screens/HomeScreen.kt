@@ -109,12 +109,16 @@ fun HomeScreen(
     // Status buka/tutup warung, dicek berkala agar pelanggan yang sudah
     // membuka aplikasi tetap tahu jika admin menutup toko secara realtime.
     var isRestaurantOpen by remember { mutableStateOf(true) }
+    var hotPromoTitle by remember { mutableStateOf("Hot Promo") }
+    var hotPromoSubtitle by remember { mutableStateOf("Penawaran spesial untukmu") }
     LaunchedEffect(Unit) {
         while (true) {
             try {
                 val settingsList = SupabaseClient.db["settings"].select().decodeList<SettingsRow>()
                 val openValue = settingsList.find { it.key == "restaurant_open" }?.value ?: 1.0
                 isRestaurantOpen = openValue >= 1.0
+                settingsList.find { it.key == "hot_promo_title" }?.description?.let { if (it.isNotBlank()) hotPromoTitle = it }
+                settingsList.find { it.key == "hot_promo_subtitle" }?.description?.let { if (it.isNotBlank()) hotPromoSubtitle = it }
             } catch (e: Exception) {
                 // Biarkan status terakhir jika gagal memuat (mis. tidak ada koneksi)
             }
@@ -123,7 +127,9 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        CartManager.selectedOrderType = "Delivery"
+        if (CartManager.selectedOrderType == null) {
+            CartManager.selectedOrderType = "Delivery"
+        }
         isLoadingMenu = true
         try {
             menuList = SupabaseClient.initializeMenuIfEmpty()
@@ -203,6 +209,8 @@ fun HomeScreen(
                         bannerList = bannerList,
                         currentPhone = currentPhone,
                         favoriteItemIds = favoriteItemIds,
+                        hotPromoTitle = hotPromoTitle,
+                        hotPromoSubtitle = hotPromoSubtitle,
                         onNavigateToLogin = onLogout
                     )
                     1 -> TabOrderHistory(
@@ -288,6 +296,8 @@ fun TabBeranda(
     bannerList: List<BannerItem>,
     currentPhone: String,
     favoriteItemIds: MutableList<String>,
+    hotPromoTitle: String = "Hot Promo",
+    hotPromoSubtitle: String = "Penawaran spesial untukmu",
     onNavigateToLogin: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -295,8 +305,6 @@ fun TabBeranda(
     val sharedPref = remember(context) { context.getSharedPreferences("lavana_prefs", android.content.Context.MODE_PRIVATE) }
     var latestVersionCode by remember { mutableStateOf(2.0) }
     var selectedCategory by remember { mutableStateOf("All") }
-    var showOrderTypeSelectionDialog by remember { mutableStateOf(false) }
-    var selectedItemForCart by remember { mutableStateOf<MenuItem?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
     val currentVersionCode = remember(context) {
@@ -462,10 +470,61 @@ fun TabBeranda(
             }
         }
 
-
+        // Pilihan Tipe Order: Delivery / Dine In
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White)
+                .border(1.dp, LightOrangeJco, RoundedCornerShape(14.dp))
+                .padding(4.dp)
+        ) {
+            val currentOrderType = CartManager.selectedOrderType ?: "Delivery"
+            listOf(
+                Triple("Delivery", "Delivery", Icons.Default.DeliveryDining),
+                Triple("Dine In", "Dine In", Icons.Default.Restaurant)
+            ).forEach { (type, label, icon) ->
+                val selected = currentOrderType == type
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(if (selected) OrangeJco else Color.Transparent)
+                        .clickable { CartManager.selectedOrderType = type }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (selected) Color.White else OrangeJco,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = label,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selected) Color.White else DarkCharcoal
+                    )
+                }
+            }
+        }
 
         // Hot Promo Banner Section — hanya tampil jika ada banner promo dari admin
         val activeBanners = bannerList
+        var selectedMenuForPreview by remember { mutableStateOf<MenuItem?>(null) }
+        var showAllPromosDialog by remember { mutableStateOf(false) }
+
+        fun openBanner(banner: BannerItem) {
+            val linkedMenu = displayMenu.find { it.id == banner.linkedMenuItemId }
+            if (linkedMenu != null) {
+                selectedMenuForPreview = linkedMenu
+            }
+        }
+
         if (activeBanners.isNotEmpty()) {
         Row(
             modifier = Modifier
@@ -476,13 +535,13 @@ fun TabBeranda(
         ) {
             Column {
                 Text(
-                    text = "Hot Promo",
+                    text = hotPromoTitle,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     color = DarkCharcoal
                 )
                 Text(
-                    text = "Penawaran spesial untukmu",
+                    text = hotPromoSubtitle,
                     fontSize = 12.sp,
                     color = Color.Gray
                 )
@@ -492,12 +551,12 @@ fun TabBeranda(
                 fontSize = 13.sp,
                 color = OrangeJco,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable { /* action */ }
+                modifier = Modifier.clickable { showAllPromosDialog = true }
             )
         }
 
             val pagerState = rememberPagerState(pageCount = { activeBanners.size })
-            
+
             LaunchedEffect(pagerState) {
                 while (true) {
                     delay(4000)
@@ -520,7 +579,9 @@ fun TabBeranda(
             ) { page ->
                 val banner = activeBanners[page]
                 Card(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { openBanner(banner) },
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
@@ -555,6 +616,122 @@ fun TabBeranda(
             }
         }
 
+        if (showAllPromosDialog) {
+            AlertDialog(
+                onDismissRequest = { showAllPromosDialog = false },
+                title = { Text(hotPromoTitle, fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 420.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        activeBanners.forEach { banner ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        showAllPromosDialog = false
+                                        openBanner(banner)
+                                    }
+                                    .padding(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(LightOrangeJco)
+                                ) {
+                                    AsyncImage(
+                                        model = banner.imageUrl,
+                                        contentDescription = banner.title,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = banner.title?.takeIf { it.isNotBlank() } ?: "Promo Spesial",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = DarkCharcoal
+                                    )
+                                    if (banner.linkedMenuItemId != null) {
+                                        val linkedName = displayMenu.find { it.id == banner.linkedMenuItemId }?.name
+                                        if (linkedName != null) {
+                                            Text("Menu: $linkedName", fontSize = 11.sp, color = OrangeJco)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showAllPromosDialog = false }) {
+                        Text("Tutup", color = Color.Gray)
+                    }
+                }
+            )
+        }
+
+        if (selectedMenuForPreview != null) {
+            val menu = selectedMenuForPreview!!
+            AlertDialog(
+                onDismissRequest = { selectedMenuForPreview = null },
+                title = { Text(menu.name, fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+                text = {
+                    Column {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(LightOrangeJco)
+                        ) {
+                            AsyncImage(
+                                model = menu.imageUrl,
+                                contentDescription = menu.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Rp ${String.format("%,.0f", menu.price)}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = OrangeJco
+                        )
+                        if (menu.getCleanDescription().isNotBlank()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(menu.getCleanDescription(), fontSize = 13.sp, color = Color.Gray)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            CartManager.addItem(menu)
+                            selectedMenuForPreview = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                    ) {
+                        Text("Tambah ke Keranjang", color = OnAccentDark, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { selectedMenuForPreview = null }) {
+                        Text("Tutup", color = Color.Gray)
+                    }
+                }
+            )
+        }
 
 
         // Apa yang ingin kamu cari? Section
@@ -1014,14 +1191,30 @@ fun TabOrderHistory(
                 }
             } else if (filteredOrders.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LightGrayJco),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.bg_teal_leaf),
+                        painter = painterResource(id = R.drawable.wm_wheat),
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 10.dp, top = 20.dp)
+                            .size(140.dp)
+                            .rotate(-18f),
+                        alpha = 0.10f
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.wm_rice),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 12.dp, bottom = 24.dp)
+                            .size(150.dp)
+                            .rotate(15f),
+                        alpha = 0.10f
                     )
                     Column(
                         modifier = Modifier.padding(24.dp),
@@ -1205,14 +1398,30 @@ fun TabWishlist(
         } else {
             if (wishlistItems.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LightGrayJco),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.bg_teal_leaf),
+                        painter = painterResource(id = R.drawable.wm_wheat),
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 10.dp, top = 20.dp)
+                            .size(140.dp)
+                            .rotate(-18f),
+                        alpha = 0.10f
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.wm_rice),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 12.dp, bottom = 24.dp)
+                            .size(150.dp)
+                            .rotate(15f),
+                        alpha = 0.10f
                     )
                     Column(
                         modifier = Modifier.padding(24.dp),
@@ -1679,7 +1888,7 @@ fun TabAkunDetail(
                             color = Color.Gray,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
-                        BulletPoint("1", "Layanan Kami adalah khusus Delivery. Tidak ada pilihan Dine In (makan di tempat) atau Take Away.")
+                        BulletPoint("1", "Layanan Kami tersedia untuk Delivery dan Dine In (makan di tempat). Belum ada pilihan Take Away.")
                         BulletPoint("2", "Ongkos kirim dihitung berdasarkan jarak per kilometer dari lokasi toko Dapoer Lavana terdekat ke titik pengiriman Anda.")
                         BulletPoint("3", "Pembayaran dilakukan menggunakan QRIS dan Transfer.")
                         BulletPoint("4", "Pembatalan pesanan hanya dapat dilakukan sebelum admin menyetujui pesanan Anda.")
@@ -2093,6 +2302,7 @@ fun JcoOrangeTopBar(title: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
             .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
@@ -2116,14 +2326,30 @@ fun JcoGuestStateUI(
     onClick: () -> Unit
 ) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.bg_teal_leaf),
+            painter = painterResource(id = R.drawable.wm_wheat),
             contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 10.dp, top = 20.dp)
+                .size(140.dp)
+                .rotate(-18f),
+            alpha = 0.08f
+        )
+        Image(
+            painter = painterResource(id = R.drawable.wm_rice),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 12.dp, bottom = 24.dp)
+                .size(150.dp)
+                .rotate(15f),
+            alpha = 0.08f
         )
         Column(
             modifier = Modifier.padding(24.dp),
@@ -2186,13 +2412,16 @@ fun JcoBottomNavigation(
     currentTab: Int,
     onTabSelected: (Int) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.5f))
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = Color.White,
+        shadowElevation = 10.dp
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White)
-                .padding(vertical = 6.dp),
+                .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {

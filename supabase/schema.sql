@@ -49,6 +49,7 @@ CREATE TABLE public.banners (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     image_url TEXT NOT NULL,
     title TEXT,
+    linked_menu_item_id UUID REFERENCES public.menu_items(id) ON DELETE SET NULL, -- tap banner -> lihat menu ini
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -99,7 +100,9 @@ INSERT INTO public.settings (key, value, description) VALUES
 ('force_update', 0, 'Set 1 untuk memaksa update (dialog tidak bisa ditutup), 0 untuk opsional (ada tombol Nanti)'),
 ('cafe_latitude', -6.2297, 'Latitude lokasi Dapoer Lavana Cafe'),
 ('cafe_longitude', 106.8296, 'Longitude lokasi Dapoer Lavana Cafe'),
-('restaurant_open', 1, 'Set 1 = warung buka (pelanggan bisa memesan), 0 = warung tutup (tampilan pelanggan diganti layar Tutup)');
+('restaurant_open', 1, 'Set 1 = warung buka (pelanggan bisa memesan), 0 = warung tutup (tampilan pelanggan diganti layar Tutup)'),
+('hot_promo_title', 0, 'Hot Promo'), -- value tidak dipakai; description = judul yang tampil di beranda pelanggan, bisa diedit Admin
+('hot_promo_subtitle', 0, 'Penawaran spesial untukmu'); -- description = subjudul di bawah judul Hot Promo
 
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Settings dapat dibaca siapa saja" ON public.settings FOR SELECT USING (true);

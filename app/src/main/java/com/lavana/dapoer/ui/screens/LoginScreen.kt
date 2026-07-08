@@ -89,31 +89,14 @@ fun LoginScreen(
     val sharedPref = remember(context) { context.getSharedPreferences("lavana_prefs", Context.MODE_PRIVATE) }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+        modifier = Modifier.fillMaxSize()
     ) {
+        // Background sage dengan motif daun baru (menggantikan motif padi/kapas lama)
         Image(
-            painter = painterResource(id = R.drawable.wm_rice),
+            painter = painterResource(id = R.drawable.bg_sage_leaf),
             contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 4.dp, bottom = 16.dp)
-                .size(170.dp)
-                .rotate(15f),
-            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White),
-            alpha = 0.10f
-        )
-        Image(
-            painter = painterResource(id = R.drawable.wm_wheat),
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 8.dp, bottom = 90.dp)
-                .size(120.dp)
-                .rotate(-18f),
-            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White),
-            alpha = 0.10f
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
         Column(
             modifier = Modifier
@@ -136,9 +119,12 @@ fun LoginScreen(
                 )
             }
 
-            // ==================== TOP HERO REGION (background gambar bersama) ====================
+            // ==================== HEADER TEAL (poni melengkung di bawah) ====================
             Box(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                    .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
             ) {
                 // Back button overlaid on the gradient (soft translucent chip for contrast)
                 IconButton(
@@ -166,32 +152,27 @@ fun LoginScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 36.dp, bottom = 40.dp),
+                        .padding(top = 40.dp, bottom = 34.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
+                    Image(
+                        painter = painterResource(id = R.drawable.logo_lavana),
+                        contentDescription = "Logo Dapoer Lavana",
                         modifier = Modifier
-                            .size(240.dp)
+                            .fillMaxWidth(0.60f)
                             .alpha(logoAlpha.value)
                             .graphicsLayer(scaleX = logoScale.value, scaleY = logoScale.value),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.logo_lavana),
-                            contentDescription = "Logo Dapoer Lavana",
-                            modifier = Modifier
-                                .height(190.dp)
-                                .fillMaxWidth(0.92f),
-                            contentScale = ContentScale.Fit,
-                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
-                        )
-                    }
+                        contentScale = ContentScale.Fit,
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "WARKOP  •  RASA  •  CERITA",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Serif,
                         letterSpacing = 1.sp,
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = Color.White.copy(alpha = 0.9f),
                         modifier = Modifier.alpha(logoAlpha.value)
                     )
                 }

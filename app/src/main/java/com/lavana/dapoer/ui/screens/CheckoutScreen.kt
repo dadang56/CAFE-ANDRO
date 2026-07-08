@@ -101,7 +101,7 @@ fun CheckoutScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(R.drawable.wm_wheat),
+                    painter = painterResource(R.drawable.wm_leaf),
                     contentDescription = null,
                     modifier = Modifier
                         .size(150.dp)
@@ -110,7 +110,7 @@ fun CheckoutScreen(
                     alpha = 0.10f
                 )
                 Image(
-                    painter = painterResource(R.drawable.wm_rice),
+                    painter = painterResource(R.drawable.wm_leaf),
                     contentDescription = null,
                     modifier = Modifier
                         .size(160.dp)

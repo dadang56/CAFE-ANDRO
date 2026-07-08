@@ -3,16 +3,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Base teal -->
+    <!-- Teal solid sesuai launcher icon baru -->
     <path
-        android:fillColor="#0E6973"
+        android:fillColor="#0B6571"
         android:pathData="M0,0 h108 v108 h-108 z" />
-    <!-- Soft lighter teal glow (top-right) for depth -->
-    <path
-        android:fillColor="#118C8C"
-        android:pathData="M108,0 m0,0 a46,46 0 1,0 -0.1,0 z" />
-    <!-- Darker teal pool (bottom) -->
-    <path
-        android:fillColor="#0A4F57"
-        android:pathData="M0,108 m0,0 a52,40 0 1,1 108,0 z" />
 </vector>

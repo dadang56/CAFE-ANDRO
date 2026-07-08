@@ -354,27 +354,13 @@ fun TabBeranda(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(LightGrayJco)) {
-        // Watermark halus agar area kosong tidak terlalu polos (di belakang konten)
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Background sage dengan motif daun baru (di belakang konten)
         Image(
-            painter = painterResource(id = R.drawable.wm_wheat),
+            painter = painterResource(id = R.drawable.bg_sage_leaf),
             contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 4.dp, bottom = 130.dp)
-                .size(160.dp)
-                .rotate(-16f),
-            alpha = 0.05f
-        )
-        Image(
-            painter = painterResource(id = R.drawable.wm_rice),
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 6.dp, bottom = 210.dp)
-                .size(120.dp)
-                .rotate(20f),
-            alpha = 0.05f
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
     Column(
         modifier = Modifier
@@ -506,6 +492,17 @@ fun TabBeranda(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         OutlinedButton(
+                            onClick = { CartManager.selectedOrderType = "Take Away" },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
+                            border = BorderStroke(1.dp, OrangeJco),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.TakeoutDining, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Take Away (Ambil Sendiri)", fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
                             onClick = { CartManager.selectedOrderType = "Dine In" },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
                             border = BorderStroke(1.dp, OrangeJco),
@@ -513,7 +510,7 @@ fun TabBeranda(
                         ) {
                             Icon(Icons.Default.Restaurant, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Dine In", fontWeight = FontWeight.Bold)
+                            Text("Dine In (Makan di Tempat)", fontWeight = FontWeight.Bold)
                         }
                     }
                 },
@@ -534,31 +531,33 @@ fun TabBeranda(
             val currentOrderType = CartManager.selectedOrderType ?: "Delivery"
             listOf(
                 Triple("Delivery", "Delivery", Icons.Default.DeliveryDining),
+                Triple("Take Away", "Take Away", Icons.Default.TakeoutDining),
                 Triple("Dine In", "Dine In", Icons.Default.Restaurant)
             ).forEach { (type, label, icon) ->
                 val selected = currentOrderType == type
-                Row(
+                Column(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(11.dp))
                         .background(if (selected) OrangeJco else Color.Transparent)
                         .clickable { CartManager.selectedOrderType = type }
-                        .padding(vertical = 10.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = if (selected) Color.White else OrangeJco,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = label,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (selected) Color.White else DarkCharcoal
+                        color = if (selected) Color.White else DarkCharcoal,
+                        maxLines = 1
                     )
                 }
             }
@@ -1248,7 +1247,7 @@ fun TabOrderHistory(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.wm_wheat),
+                        painter = painterResource(id = R.drawable.wm_leaf),
                         contentDescription = null,
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -1258,7 +1257,7 @@ fun TabOrderHistory(
                         alpha = 0.10f
                     )
                     Image(
-                        painter = painterResource(id = R.drawable.wm_rice),
+                        painter = painterResource(id = R.drawable.wm_leaf),
                         contentDescription = null,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -1455,7 +1454,7 @@ fun TabWishlist(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.wm_wheat),
+                        painter = painterResource(id = R.drawable.wm_leaf),
                         contentDescription = null,
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -1465,7 +1464,7 @@ fun TabWishlist(
                         alpha = 0.10f
                     )
                     Image(
-                        painter = painterResource(id = R.drawable.wm_rice),
+                        painter = painterResource(id = R.drawable.wm_leaf),
                         contentDescription = null,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -1939,7 +1938,7 @@ fun TabAkunDetail(
                             color = Color.Gray,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
-                        BulletPoint("1", "Layanan Kami tersedia untuk Delivery dan Dine In (makan di tempat). Belum ada pilihan Take Away.")
+                        BulletPoint("1", "Layanan Kami tersedia untuk Delivery, Take Away (ambil sendiri), dan Dine In (makan di tempat).")
                         BulletPoint("2", "Ongkos kirim dihitung berdasarkan jarak per kilometer dari lokasi toko Dapoer Lavana terdekat ke titik pengiriman Anda.")
                         BulletPoint("3", "Pembayaran dilakukan menggunakan QRIS dan Transfer.")
                         BulletPoint("4", "Pembatalan pesanan hanya dapat dilakukan sebelum admin menyetujui pesanan Anda.")
@@ -2377,30 +2376,14 @@ fun JcoGuestStateUI(
     onClick: () -> Unit
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.wm_wheat),
+            painter = painterResource(id = R.drawable.bg_sage_leaf),
             contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 10.dp, top = 20.dp)
-                .size(140.dp)
-                .rotate(-18f),
-            alpha = 0.08f
-        )
-        Image(
-            painter = painterResource(id = R.drawable.wm_rice),
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 24.dp)
-                .size(150.dp)
-                .rotate(15f),
-            alpha = 0.08f
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
         Column(
             modifier = Modifier.padding(24.dp),

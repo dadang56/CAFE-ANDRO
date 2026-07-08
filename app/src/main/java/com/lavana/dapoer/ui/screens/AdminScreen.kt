@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -205,6 +207,7 @@ fun TabAdminOrders() {
     var previewReceiptUrl by remember { mutableStateOf<String?>(null) }
     var chatOrder by remember { mutableStateOf<Order?>(null) }
 
+    var showKasirDialog by remember { mutableStateOf(false) }
     var selectedOrderForPrint by remember { mutableStateOf<Order?>(null) }
     var printOrderItems by remember { mutableStateOf<List<OrderItem>>(emptyList()) }
     var printMenuItemsMap by remember { mutableStateOf<Map<String, MenuItem>>(emptyMap()) }
@@ -316,6 +319,32 @@ fun TabAdminOrders() {
             }
         }
 
+        // POS Kasir: buat pesanan langsung untuk pelanggan yang memesan di tempat (tanpa aplikasi)
+        Button(
+            onClick = { showKasirDialog = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .height(46.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+        ) {
+            Icon(Icons.Default.AddShoppingCart, contentDescription = null, tint = OnAccentDark, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Buat Pesanan (Kasir)", color = OnAccentDark, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+
+        if (showKasirDialog) {
+            KasirOrderDialog(
+                onDismiss = { showKasirDialog = false },
+                onCreated = { created ->
+                    showKasirDialog = false
+                    refreshData()
+                    fetchPrintItems(created)
+                }
+            )
+        }
+
         if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -377,6 +406,19 @@ fun TabAdminOrders() {
                                             set("status", "Dibatalkan")
                                             set("payment_status", "Ditolak")
                                             set("notes", "[Ditolak: $reason]")
+                                        }) { filter { eq("id", order.id ?: "") } }
+                                        refreshData()
+                                    } catch (e: Exception) {}
+                                }
+                            },
+                            onLocalPayment = {
+                                coroutineScope.launch {
+                                    try {
+                                        // Pembayaran tunai di tempat: catat metode & tandai lunas, lalu proses.
+                                        SupabaseClient.db["orders"].update({
+                                            set("status", "Diproses")
+                                            set("payment_status", "Terbayar")
+                                            set("payment_method", "Tunai (Bayar di Tempat)")
                                         }) { filter { eq("id", order.id ?: "") } }
                                         refreshData()
                                     } catch (e: Exception) {}
@@ -853,6 +895,227 @@ fun TabAdminOrders() {
     }
 }
 
+// ==========================================================
+// POS KASIR: buat pesanan langsung untuk pelanggan yang memesan di tempat
+// ==========================================================
+@Composable
+fun KasirOrderDialog(
+    onDismiss: () -> Unit,
+    onCreated: (Order) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var menu by remember { mutableStateOf<List<MenuItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var orderType by remember { mutableStateOf("Dine In") }
+    var payment by remember { mutableStateOf("Tunai") }
+    var customerName by remember { mutableStateOf("") }
+    val cart = remember { mutableStateMapOf<String, Int>() }
+    var saving by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        menu = try {
+            SupabaseClient.db["menu_items"].select().decodeList<MenuItem>().filter { it.isAvailable }
+        } catch (e: Exception) { emptyList() }
+        loading = false
+    }
+
+    val subtotal = menu.sumOf { (cart[it.id] ?: 0) * it.price }
+    val totalQty = cart.values.sum()
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = LightGrayJco) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen)))
+                        .padding(horizontal = 12.dp, vertical = 14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, contentDescription = "Tutup", tint = Color.White)
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        Column {
+                            Text("Pesanan Baru (Kasir)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("Pesan langsung di tempat, tanpa aplikasi", color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
+                        }
+                    }
+                }
+
+                // Tipe pesanan + nama
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White)
+                            .border(1.dp, LightOrangeJco, RoundedCornerShape(12.dp))
+                            .padding(4.dp)
+                    ) {
+                        listOf("Dine In" to Icons.Default.Restaurant, "Take Away" to Icons.Default.TakeoutDining).forEach { (type, icon) ->
+                            val sel = orderType == type
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(if (sel) OrangeJco else Color.Transparent)
+                                    .clickable { orderType = type }
+                                    .padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(icon, contentDescription = null, tint = if (sel) Color.White else OrangeJco, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(type, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (sel) Color.White else DarkCharcoal)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = customerName,
+                        onValueChange = { customerName = it },
+                        placeholder = { Text("Nama pemesan (opsional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = OrangeJco,
+                            unfocusedBorderColor = Color.LightGray,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        )
+                    )
+                }
+
+                // Daftar menu + stepper qty
+                if (loading) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = OrangeJco)
+                    }
+                } else if (menu.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text("Belum ada menu tersedia.", color = Color.Gray)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(menu) { item ->
+                            val qty = cart[item.id] ?: 0
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(item.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("Rp ${String.format("%,.0f", item.price)}", fontSize = 12.sp, color = OrangeJco)
+                                    }
+                                    IconButton(
+                                        onClick = { if (qty > 0) { if (qty - 1 == 0) cart.remove(item.id) else cart[item.id] = qty - 1 } },
+                                        enabled = qty > 0
+                                    ) {
+                                        Icon(Icons.Default.Remove, contentDescription = "Kurang", tint = if (qty > 0) OrangeJco else Color.LightGray)
+                                    }
+                                    Text("$qty", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkCharcoal, textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 22.dp))
+                                    IconButton(onClick = { cart[item.id] = qty + 1 }) {
+                                        Icon(Icons.Default.Add, contentDescription = "Tambah", tint = OrangeJco)
+                                    }
+                                }
+                            }
+                        }
+                        item { Spacer(Modifier.height(4.dp)) }
+                    }
+                }
+
+                // Bar bawah: metode bayar + total + simpan
+                Surface(color = Color.White, shadowElevation = 12.dp) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Bayar:", fontSize = 13.sp, color = DarkCharcoal, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.width(10.dp))
+                            listOf("Tunai", "QRIS").forEach { m ->
+                                val sel = payment == m
+                                Box(
+                                    modifier = Modifier
+                                        .padding(end = 8.dp)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(if (sel) OrangeJco else LightGrayJco)
+                                        .clickable { payment = m }
+                                        .padding(horizontal = 18.dp, vertical = 7.dp)
+                                ) {
+                                    Text(m, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (sel) Color.White else DarkCharcoal)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Total ($totalQty item)", fontSize = 12.sp, color = Color.Gray)
+                                Text("Rp ${String.format("%,.0f", subtotal)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = ForestGreen)
+                            }
+                            Button(
+                                onClick = {
+                                    if (totalQty == 0 || saving) return@Button
+                                    saving = true
+                                    scope.launch {
+                                        try {
+                                            val order = Order(
+                                                userId = null,
+                                                orderType = orderType,
+                                                status = "Selesai",
+                                                subtotal = subtotal,
+                                                total = subtotal,
+                                                paymentMethod = payment,
+                                                paymentStatus = "Terbayar",
+                                                notes = "Pesanan langsung di kasir",
+                                                customerName = customerName.trim().ifBlank { null },
+                                                cashierUsername = CartManager.currentStaff?.username
+                                            )
+                                            val inserted = SupabaseClient.db["orders"].insert(order) { select() }.decodeSingle<Order>()
+                                            val items = menu.filter { (cart[it.id] ?: 0) > 0 }.map {
+                                                OrderItem(orderId = inserted.id!!, menuItemId = it.id, quantity = cart[it.id]!!, priceAtOrder = it.price)
+                                            }
+                                            if (items.isNotEmpty()) SupabaseClient.db["order_items"].insert(items)
+                                            android.widget.Toast.makeText(context, "Pesanan kasir tersimpan!", android.widget.Toast.LENGTH_SHORT).show()
+                                            onCreated(inserted)
+                                        } catch (e: Exception) {
+                                            android.widget.Toast.makeText(context, "Gagal menyimpan: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                        } finally {
+                                            saving = false
+                                        }
+                                    }
+                                },
+                                enabled = totalQty > 0 && !saving,
+                                modifier = Modifier.height(50.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                            ) {
+                                if (saving) {
+                                    CircularProgressIndicator(color = OnAccentDark, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                                } else {
+                                    Icon(Icons.Default.Print, contentDescription = null, tint = OnAccentDark, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Simpan & Cetak", color = OnAccentDark, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun AdminOrderCard(
     order: Order,
@@ -862,11 +1125,13 @@ fun AdminOrderCard(
     onShowReceipt: (String) -> Unit,
     onPrintReceipt: () -> Unit,
     onOpenChat: () -> Unit,
-    onRejectPayment: (String) -> Unit
+    onRejectPayment: (String) -> Unit,
+    onLocalPayment: () -> Unit
 ) {
     var showRejectDialog by remember { mutableStateOf(false) }
     var rejectReasonInput by remember { mutableStateOf("") }
     var showConfirmPaymentDialog by remember { mutableStateOf(false) }
+    var showLocalPaymentDialog by remember { mutableStateOf(false) }
     val assignedDriverName = remember(order.driverId, drivers) {
         drivers.find { it.id == order.driverId }?.name ?: "Belum Ditugaskan"
     }
@@ -916,19 +1181,36 @@ fun AdminOrderCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            val isDineIn = order.orderType == "Dine In"
+            val isDelivery = order.orderType == "Delivery"
+            val isTakeAway = order.orderType == "Take Away"
+            // Warna badge dibedakan jelas per tipe: Delivery = biru, Take Away = ungu, Dine In = oranye.
+            val typeBg = when {
+                isDelivery -> Color(0xFFDCEFFB)
+                isTakeAway -> Color(0xFFEDE7F6)
+                else -> LightOrangeJco
+            }
+            val typeColor = when {
+                isDelivery -> Color(0xFF2563EB)
+                isTakeAway -> Color(0xFF7E57C2)
+                else -> OrangeJco
+            }
+            val typeIcon = when {
+                isDelivery -> Icons.Default.DeliveryDining
+                isTakeAway -> Icons.Default.TakeoutDining
+                else -> Icons.Default.Restaurant
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (isDineIn) LightOrangeJco else Color(0xFFDCEFFB))
+                        .background(typeBg)
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = if (isDineIn) Icons.Default.Restaurant else Icons.Default.DeliveryDining,
+                            imageVector = typeIcon,
                             contentDescription = null,
-                            tint = if (isDineIn) OrangeJco else Color(0xFF2563EB),
+                            tint = typeColor,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -936,12 +1218,12 @@ fun AdminOrderCard(
                             text = order.orderType,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDineIn) OrangeJco else Color(0xFF2563EB)
+                            color = typeColor
                         )
                     }
                 }
             }
-            if (!isDineIn) {
+            if (isDelivery) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text("Alamat: ${order.deliveryAddress ?: "-"}", fontSize = 12.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -1042,6 +1324,20 @@ fun AdminOrderCard(
                             Text("Konfirmasi Pembayaran", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
                     }
+                    // Pembayaran Lokal: kasir menandai pesanan LUNAS dibayar tunai di tempat
+                    // (untuk pelanggan Dine In/Take Away yang bayar langsung di kasir).
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { showLocalPaymentDialog = true },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ForestGreen),
+                        border = BorderStroke(1.dp, ForestGreen),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(36.dp)
+                    ) {
+                        Icon(Icons.Default.Payments, contentDescription = null, tint = ForestGreen, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Bayar di Tempat (Tunai)", fontSize = 12.sp, color = ForestGreen, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
                 }
                 "Diproses" -> {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1122,6 +1418,35 @@ fun AdminOrderCard(
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmPaymentDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Pembayaran Lokal (bayar tunai di tempat) -- menandai pesanan LUNAS via kasir.
+    if (showLocalPaymentDialog) {
+        AlertDialog(
+            onDismissRequest = { showLocalPaymentDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Bayar di Tempat (Tunai)", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Text("Tandai Pesanan #${order.orderNumber} sebagai LUNAS dibayar tunai di tempat? Metode pembayaran akan tercatat \"Tunai (Bayar di Tempat)\" dan pesanan langsung diproses.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLocalPaymentDialog = false
+                        onLocalPayment()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+                ) {
+                    Text("Ya, Sudah Bayar Tunai", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLocalPaymentDialog = false }) {
                     Text("Batal")
                 }
             }

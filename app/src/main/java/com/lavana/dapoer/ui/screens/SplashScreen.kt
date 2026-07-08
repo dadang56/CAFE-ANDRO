@@ -77,32 +77,15 @@ fun SplashScreen(onAnimationFinished: () -> Unit) {
     )
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(OrangeJco, ForestGreen))),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        // Background teal (file asli dari user) dengan motif daun
         Image(
-            painter = painterResource(id = R.drawable.wm_rice),
+            painter = painterResource(id = R.drawable.bg_teal_leaf),
             contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 8.dp, bottom = 40.dp)
-                .size(180.dp)
-                .rotate(18f),
-            colorFilter = ColorFilter.tint(Color.White),
-            alpha = 0.10f
-        )
-        Image(
-            painter = painterResource(id = R.drawable.wm_wheat),
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 12.dp, top = 48.dp)
-                .size(130.dp)
-                .rotate(-15f),
-            colorFilter = ColorFilter.tint(Color.White),
-            alpha = 0.08f
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
 
         Column(
@@ -118,13 +101,6 @@ fun SplashScreen(onAnimationFinished: () -> Unit) {
                     .scale(scale.value * breath),
                 contentScale = ContentScale.Fit,
                 colorFilter = ColorFilter.tint(Color.White)
-            )
-            Text(
-                text = "WARKOP  •  RASA  •  CERITA",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 1.sp,
-                color = Color.White.copy(alpha = 0.85f)
             )
         }
 

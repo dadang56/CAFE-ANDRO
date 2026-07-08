@@ -1,0 +1,42 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="160dp"
+    android:height="320dp"
+    android:viewportWidth="160"
+    android:viewportHeight="320">
+    <!-- Batang / ranting daun yang melengkung -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M96,316 C84,258 116,206 104,150 C96,110 112,66 100,20" />
+    <!-- Pasangan daun berselang-seling, mengecil ke atas -->
+    <group android:translateX="92" android:translateY="268" android:rotation="-52" android:scaleX="1.05" android:scaleY="1.05">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+    <group android:translateX="104" android:translateY="232" android:rotation="46">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+    <group android:translateX="100" android:translateY="196" android:rotation="-50" android:scaleX="0.95" android:scaleY="0.95">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+    <group android:translateX="106" android:translateY="160" android:rotation="44" android:scaleX="0.9" android:scaleY="0.9">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+    <group android:translateX="101" android:translateY="126" android:rotation="-48" android:scaleX="0.82" android:scaleY="0.82">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+    <group android:translateX="105" android:translateY="94" android:rotation="42" android:scaleX="0.72" android:scaleY="0.72">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+    <group android:translateX="100" android:translateY="64" android:rotation="-46" android:scaleX="0.6" android:scaleY="0.6">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+    <group android:translateX="102" android:translateY="38" android:rotation="40" android:scaleX="0.52" android:scaleY="0.52">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+    <!-- Daun pucuk -->
+    <group android:translateX="100" android:translateY="18" android:rotation="-6" android:scaleX="0.46" android:scaleY="0.46">
+        <path android:fillColor="#FFFFFF" android:pathData="M0,0 C-7,-9 -7,-24 0,-35 C7,-24 7,-9 0,0 Z" />
+    </group>
+</vector>

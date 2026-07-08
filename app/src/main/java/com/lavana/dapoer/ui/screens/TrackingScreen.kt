@@ -733,10 +733,16 @@ fun TrackingScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    if (orderType == "Dine In") {
-                        // Dine In tidak butuh linimasa pengiriman -- cukup diterima lalu selesai.
+                    if (orderType != "Delivery") {
+                        // Dine In & Take Away tidak butuh linimasa pengiriman -- cukup diterima lalu siap.
                         TrackingStepItem(stepNumber = 1, title = "Pesanan Diterima", time = "10:15 WIB", isActive = activeStep >= 1)
-                        TrackingStepItem(stepNumber = 2, title = "Selesai Disajikan", time = "Menunggu", isActive = activeStep >= 4, isLast = true)
+                        TrackingStepItem(
+                            stepNumber = 2,
+                            title = if (orderType == "Take Away") "Siap Diambil" else "Selesai Disajikan",
+                            time = "Menunggu",
+                            isActive = activeStep >= 4,
+                            isLast = true
+                        )
                     } else {
                         TrackingStepItem(stepNumber = 1, title = "Pesanan Diterima", time = "10:15 WIB", isActive = activeStep >= 1)
                         TrackingStepItem(stepNumber = 2, title = "Sedang Disiapkan di Dapur", time = "10:25 WIB", isActive = activeStep >= 2)

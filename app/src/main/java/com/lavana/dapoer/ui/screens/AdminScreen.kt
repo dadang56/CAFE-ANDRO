@@ -3595,22 +3595,27 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                                     val perKmVal = perKmFee.toDoubleOrNull() ?: 2500.0
                                     val latVal = cafeLat.toDoubleOrNull() ?: -6.2297
                                     val lonVal = cafeLon.toDoubleOrNull() ?: 106.8296
-                                    
-                                    SupabaseClient.db["settings"].update({
-                                        set("value", baseVal)
-                                    }) { filter { eq("key", "delivery_base_fee") } }
-                                    
-                                    SupabaseClient.db["settings"].update({
-                                        set("value", perKmVal)
-                                    }) { filter { eq("key", "delivery_per_km_fee") } }
-                                    
-                                    SupabaseClient.db["settings"].update({
-                                        set("value", latVal)
-                                    }) { filter { eq("key", "cafe_latitude") } }
-                                    
-                                    SupabaseClient.db["settings"].update({
-                                        set("value", lonVal)
-                                    }) { filter { eq("key", "cafe_longitude") } }
+
+                                    // Upsert (bukan update) -- baris cafe_latitude/cafe_longitude
+                                    // ternyata belum pernah ada di database produksi, sehingga
+                                    // update()+filter sebelumnya selalu no-op tanpa error (0 baris
+                                    // cocok) dan lokasi toko tidak pernah benar-benar tersimpan.
+                                    SupabaseClient.db["settings"].upsert(
+                                        SettingsRow("delivery_base_fee", baseVal, "Tarif dasar pengiriman (jarak minimum)"),
+                                        onConflict = "key"
+                                    )
+                                    SupabaseClient.db["settings"].upsert(
+                                        SettingsRow("delivery_per_km_fee", perKmVal, "Tarif tambahan per KM setelah jarak dasar terlewati"),
+                                        onConflict = "key"
+                                    )
+                                    SupabaseClient.db["settings"].upsert(
+                                        SettingsRow("cafe_latitude", latVal, "Latitude lokasi Dapoer Lavana Cafe"),
+                                        onConflict = "key"
+                                    )
+                                    SupabaseClient.db["settings"].upsert(
+                                        SettingsRow("cafe_longitude", lonVal, "Longitude lokasi Dapoer Lavana Cafe"),
+                                        onConflict = "key"
+                                    )
                                     
                                     val bannerList = SupabaseClient.db["banners"].select().decodeList<BannerItem>()
                                     val oldBankBanner = bannerList.firstOrNull { it.title?.startsWith("payment_bank|") == true }

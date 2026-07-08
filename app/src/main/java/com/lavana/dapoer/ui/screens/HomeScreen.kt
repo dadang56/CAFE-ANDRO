@@ -1170,7 +1170,7 @@ fun TabOrderHistory(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().background(LightGrayJco)) {
         // Orange top bar
         JcoOrangeTopBar(title = "Pesanan")
 
@@ -1434,7 +1434,7 @@ fun TabWishlist(
         displayMenu.filter { favoriteItemIds.contains(it.id) }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().background(LightGrayJco)) {
         JcoOrangeTopBar(title = "Favorit")
 
         if (isGuest) {

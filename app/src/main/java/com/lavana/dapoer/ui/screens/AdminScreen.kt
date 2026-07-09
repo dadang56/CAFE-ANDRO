@@ -2082,7 +2082,12 @@ fun TabAdminBanners() {
             }
         }
 
-        Column(modifier = Modifier.weight(1f).padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
 
         // Judul & Subjudul "Hot Promo" di beranda pelanggan
         Card(
@@ -2271,27 +2276,25 @@ fun TabAdminBanners() {
         Spacer(modifier = Modifier.height(12.dp))
 
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(color = OrangeJco)
                     Text("Memuat banner...", fontSize = 13.sp, color = Color.Gray)
                 }
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            // Column biasa (bukan LazyColumn) -- daftar banner ini sekarang bersarang di dalam
+            // Column induk yang sudah verticalScroll, dan LazyColumn tidak boleh dipasang di
+            // dalam parent yang juga scrollable (akan crash: infinite height constraints).
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (banners.isEmpty()) {
-                    item {
-                        AdminEmptyState(
-                            icon = Icons.Default.Bookmark,
-                            title = "Belum ada banner",
-                            subtitle = "Tambahkan banner promo untuk tampil di beranda."
-                        )
-                    }
+                    AdminEmptyState(
+                        icon = Icons.Default.Bookmark,
+                        title = "Belum ada banner",
+                        subtitle = "Tambahkan banner promo untuk tampil di beranda."
+                    )
                 }
-                items(banners) { banner ->
+                banners.forEach { banner ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
@@ -3745,8 +3748,8 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = {
-                        if (regName.isBlank() || regUsername.isBlank() || regPassword.isBlank()) {
-                            regErrorMessage = "Nama, Username, dan Password wajib diisi!"
+                        if (regName.isBlank() || regUsername.isBlank() || regPassword.isBlank() || regContact.isBlank()) {
+                            regErrorMessage = "Semua bidang wajib diisi!"
                             return@Button
                         }
                         regErrorMessage = null

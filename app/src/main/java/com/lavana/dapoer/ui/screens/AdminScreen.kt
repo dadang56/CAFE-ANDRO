@@ -1081,7 +1081,13 @@ fun KasirOrderDialog(
                                                 customerName = customerName.trim().ifBlank { null },
                                                 cashierUsername = CartManager.currentStaff?.username
                                             )
-                                            val inserted = SupabaseClient.db["orders"].insert(order) { select() }.decodeSingle<Order>()
+                                            val inserted = try {
+                                                SupabaseClient.db["orders"].insert(order) { select() }.decodeSingle<Order>()
+                                            } catch (e: Exception) {
+                                                if (e.message?.contains("customer_name", ignoreCase = true) == true) {
+                                                    SupabaseClient.db["orders"].insert(order.copy(customerName = null)) { select() }.decodeSingle<Order>()
+                                                } else throw e
+                                            }
                                             val items = menu.filter { (cart[it.id] ?: 0) > 0 }.map {
                                                 OrderItem(orderId = inserted.id!!, menuItemId = it.id, quantity = cart[it.id]!!, priceAtOrder = it.price)
                                             }
@@ -2871,7 +2877,7 @@ fun TabAdminProfile(onLogout: () -> Unit) {
     val scrollState = rememberScrollState()
 
     var baseFee by remember { mutableStateOf("") }
-    var perKmFee by remember { mutableStateOf("") }
+    var per50mFee by remember { mutableStateOf("") }
     var cafeLat by remember { mutableStateOf("") }
     var cafeLon by remember { mutableStateOf("") }
     var isSavingSettings by remember { mutableStateOf(false) }
@@ -3149,7 +3155,7 @@ fun TabAdminProfile(onLogout: () -> Unit) {
             settingsList.forEach { row ->
                 when (row.key) {
                     "delivery_base_fee" -> baseFee = row.value.toInt().toString()
-                    "delivery_per_km_fee" -> perKmFee = row.value.toInt().toString()
+                    "delivery_per_50m_fee" -> per50mFee = row.value.toInt().toString()
                     "cafe_latitude" -> cafeLat = row.value.toString()
                     "cafe_longitude" -> cafeLon = row.value.toString()
                     "restaurant_open" -> isRestaurantOpen = row.value >= 1.0
@@ -3157,7 +3163,7 @@ fun TabAdminProfile(onLogout: () -> Unit) {
             }
         } catch (e: Exception) {
             baseFee = "5000"
-            perKmFee = "2500"
+            per50mFee = "200"
             cafeLat = "-6.2297"
             cafeLon = "106.8296"
         }
@@ -3343,9 +3349,9 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = perKmFee,
-                        onValueChange = { perKmFee = it },
-                        label = { Text("Ongkos per Kilometer (IDR)") },
+                        value = per50mFee,
+                        onValueChange = { per50mFee = it },
+                        label = { Text("Ongkos per 50 Meter (IDR)") },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -3595,7 +3601,7 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                                     }
                                     
                                     val baseVal = baseFee.toDoubleOrNull() ?: 5000.0
-                                    val perKmVal = perKmFee.toDoubleOrNull() ?: 2500.0
+                                    val per50mVal = per50mFee.toDoubleOrNull() ?: 200.0
                                     val latVal = cafeLat.toDoubleOrNull() ?: -6.2297
                                     val lonVal = cafeLon.toDoubleOrNull() ?: 106.8296
 
@@ -3608,7 +3614,7 @@ fun TabAdminProfile(onLogout: () -> Unit) {
                                         onConflict = "key"
                                     )
                                     SupabaseClient.db["settings"].upsert(
-                                        SettingsRow("delivery_per_km_fee", perKmVal, "Tarif tambahan per KM setelah jarak dasar terlewati"),
+                                        SettingsRow("delivery_per_50m_fee", per50mVal, "Tarif tambahan per 50 meter setelah jarak dasar terlewati"),
                                         onConflict = "key"
                                     )
                                     SupabaseClient.db["settings"].upsert(

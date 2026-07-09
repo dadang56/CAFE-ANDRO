@@ -391,24 +391,25 @@ fun DapoerLavanaAppNavigation() {
         composable("login") {
             LoginScreen(
                 onNavigateToCustomer = {
-                    // Bersihkan SELURUH back stack (bukan cuma "login") -- sebelumnya hanya
-                    // "login" yang di-pop, sehingga "home" yang tersembunyi DI BAWAH "login"
-                    // (mis. saat Guest ditendang ke Login dari Beranda) tetap ada di back
-                    // stack. Tombol back Android lalu bisa "mundur" ke Beranda lama sambil
-                    // sesi login yang baru (mis. Admin) masih aktif -- bug: tampilan beralih
-                    // ke laman pelanggan tapi identitas admin masih terpasang.
+                    // Bersihkan SELURUH back stack setelah login. Sebelumnya memakai
+                    // findStartDestination().id ("splash"), TAPI "splash" sudah di-pop saat
+                    // transisi splash->home, jadi popUpTo("splash") tidak cocok apa pun (no-op)
+                    // dan entri lama [home, login] tetap tertinggal -> tombol back mundur ke
+                    // Beranda lama / laman login. popUpTo(graph.id) membuang seluruh back stack
+                    // sampai akar graph, sehingga setelah login destinasi ini jadi satu-satunya
+                    // entri dan tombol back keluar dari aplikasi.
                     navController.navigate("home") {
-                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                        popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
                 onNavigateToAdmin = {
                     navController.navigate("admin_dashboard") {
-                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                        popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
                 onNavigateToDriver = {
                     navController.navigate("driver_dashboard") {
-                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                        popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
                 onNavigateBack = {

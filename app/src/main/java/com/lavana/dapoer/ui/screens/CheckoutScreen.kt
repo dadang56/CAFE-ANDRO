@@ -253,7 +253,8 @@ fun CheckoutScreen(
     // Parameter Tarif Dinamis dari Supabase
     var baseDistance by remember { mutableStateOf(2.0) }
     var baseFee by remember { mutableStateOf(5000.0) }
-    var perKmFee by remember { mutableStateOf(2500.0) }
+    // Tarif jarak sekarang dihitung per 50 meter (lebih rinci daripada per-km).
+    var per50mFee by remember { mutableStateOf(200.0) }
 
     LaunchedEffect(Unit) {
         if (orderType == "Delivery") {
@@ -288,7 +289,7 @@ fun CheckoutScreen(
                 when (row.key) {
                     "delivery_base_distance_km" -> baseDistance = row.value
                     "delivery_base_fee" -> baseFee = row.value
-                    "delivery_per_km_fee" -> perKmFee = row.value
+                    "delivery_per_50m_fee" -> per50mFee = row.value
                     "cafe_latitude" -> lat = row.value
                     "cafe_longitude" -> lng = row.value
                 }
@@ -319,11 +320,14 @@ fun CheckoutScreen(
         }
     }
     
-    val deliveryFee = remember(distanceKm, baseDistance, baseFee, perKmFee) {
+    val deliveryFee = remember(distanceKm, baseDistance, baseFee, per50mFee) {
         if (distanceKm <= baseDistance) {
             baseFee
         } else {
-            baseFee + ((distanceKm - baseDistance) * perKmFee)
+            // Setiap kelipatan 50 meter di atas jarak dasar dikenakan tarif per50mFee.
+            val extraMeters = (distanceKm - baseDistance) * 1000.0
+            val blocks = kotlin.math.ceil(extraMeters / 50.0)
+            baseFee + blocks * per50mFee
         }
     }
     
@@ -421,10 +425,21 @@ fun CheckoutScreen(
                                         customerName = customerNameInput.trim().ifBlank { null }
                                     )
 
-                                    // 1. Kirim order ke Supabase
-                                    val insertedOrder = SupabaseClient.db["orders"].insert(newOrder) {
-                                        select()
-                                    }.decodeSingle<Order>()
+                                    // 1. Kirim order ke Supabase. Pengaman: bila kolom
+                                    // customer_name belum ada di database (migrasi belum
+                                    // dijalankan), jangan gagalkan seluruh pesanan -- ulangi
+                                    // tanpa nama agar order tetap masuk.
+                                    val insertedOrder = try {
+                                        SupabaseClient.db["orders"].insert(newOrder) {
+                                            select()
+                                        }.decodeSingle<Order>()
+                                    } catch (e: Exception) {
+                                        if (e.message?.contains("customer_name", ignoreCase = true) == true) {
+                                            SupabaseClient.db["orders"].insert(newOrder.copy(customerName = null)) {
+                                                select()
+                                            }.decodeSingle<Order>()
+                                        } else throw e
+                                    }
 
                                     val orderId = insertedOrder.id!!
 

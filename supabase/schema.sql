@@ -94,7 +94,8 @@ CREATE TABLE public.settings (
 INSERT INTO public.settings (key, value, description) VALUES
 ('delivery_base_fee', 5000.0, 'Tarif dasar pengiriman (jarak minimum)'),
 ('delivery_base_distance_km', 2.0, 'Jarak minimum dalam KM untuk tarif dasar'),
-('delivery_per_km_fee', 2500.0, 'Tarif tambahan per KM setelah jarak dasar terlewati'),
+('delivery_per_km_fee', 2500.0, 'DEPRECATED (dipakai versi lama) -- tarif tambahan per KM'),
+('delivery_per_50m_fee', 150.0, 'Tarif tambahan per 50 meter setelah jarak dasar terlewati'),
 ('delivery_max_distance_km', 15.0, 'Batas jarak pengiriman maksimum dalam KM'),
 ('latest_version_code', 12, 'versionCode APK terbaru. HARUS > versionCode app terpasang agar dialog update muncul. Naikkan tiap rilis (samakan dengan versionCode di build.gradle.kts). Deskripsi baris ini dipakai sebagai Catatan Rilis di dialog update.'),
 ('force_update', 0, 'Set 1 untuk memaksa update (dialog tidak bisa ditutup), 0 untuk opsional (ada tombol Nanti)'),

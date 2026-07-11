@@ -423,6 +423,28 @@ fun TabAdminOrders() {
                                         refreshData()
                                     } catch (e: Exception) {}
                                 }
+                            },
+                            onMarkReady = {
+                                // Take Away / Dine In tidak butuh driver -- ditandai "Siap"
+                                // saat pesanan sudah selesai dimasak (memicu notifikasi ke pelanggan).
+                                coroutineScope.launch {
+                                    try {
+                                        SupabaseClient.db["orders"].update({
+                                            set("status", "Siap")
+                                        }) { filter { eq("id", order.id ?: "") } }
+                                        refreshData()
+                                    } catch (e: Exception) {}
+                                }
+                            },
+                            onCompleteOrder = {
+                                coroutineScope.launch {
+                                    try {
+                                        SupabaseClient.db["orders"].update({
+                                            set("status", "Selesai")
+                                        }) { filter { eq("id", order.id ?: "") } }
+                                        refreshData()
+                                    } catch (e: Exception) {}
+                                }
                             }
                         )
                     }
@@ -1132,7 +1154,9 @@ fun AdminOrderCard(
     onPrintReceipt: () -> Unit,
     onOpenChat: () -> Unit,
     onRejectPayment: (String) -> Unit,
-    onLocalPayment: () -> Unit
+    onLocalPayment: () -> Unit,
+    onMarkReady: () -> Unit,
+    onCompleteOrder: () -> Unit
 ) {
     var showRejectDialog by remember { mutableStateOf(false) }
     var rejectReasonInput by remember { mutableStateOf("") }
@@ -1162,6 +1186,7 @@ fun AdminOrderCard(
                             when (order.status) {
                                 "Pending" -> Color(0xFFFEF3C7)
                                 "Diproses" -> Color(0xFFDBEAFE)
+                                "Siap" -> Color(0xFFE0F2FE)
                                 "Diantar" -> Color(0xFFE0F2FE)
                                 "Selesai" -> Color(0xFFD1FAE5)
                                 "Dibatalkan" -> Color(0xFFFEE2E2)
@@ -1177,6 +1202,7 @@ fun AdminOrderCard(
                         color = when (order.status) {
                             "Pending" -> Color(0xFFD97706)
                             "Diproses" -> Color(0xFF2563EB)
+                            "Siap" -> Color(0xFF0284C7)
                             "Diantar" -> Color(0xFF0284C7)
                             "Selesai" -> Color(0xFF059669)
                             "Dibatalkan" -> RedPromo
@@ -1347,13 +1373,40 @@ fun AdminOrderCard(
                 }
                 "Diproses" -> {
                     Spacer(modifier = Modifier.height(8.dp))
+                    if (order.orderType == "Delivery") {
+                        // Delivery butuh driver untuk mengantar.
+                        Button(
+                            onClick = onAssignDriverClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
+                        ) {
+                            Text("Tugaskan Driver", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        // Take Away / Dine In tidak butuh driver -- cukup tandai siap.
+                        Button(
+                            onClick = onMarkReady,
+                            colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
+                        ) {
+                            Text(
+                                if (order.orderType == "Take Away") "Tandai Siap Diambil" else "Tandai Siap Disajikan",
+                                fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                "Siap" -> {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Button(
-                        onClick = onAssignDriverClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                        onClick = onCompleteOrder,
+                        colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth().height(36.dp)
                     ) {
-                        Text("Tugaskan Driver", fontSize = 12.sp, color = OnAccentDark, fontWeight = FontWeight.Bold)
+                        Text("Selesaikan Pesanan", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
                 else -> {}

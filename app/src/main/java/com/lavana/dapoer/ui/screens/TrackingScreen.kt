@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import io.github.jan.supabase.storage.storage
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.window.Dialog
 import android.widget.Toast
 import androidx.compose.ui.text.font.FontFamily
 import com.lavana.dapoer.data.*
@@ -27,11 +28,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.ui.graphics.Brush
@@ -75,6 +78,7 @@ fun TrackingScreen(
     var bankOwner by remember { mutableStateOf("Dapoer Lavana") }
 
     var selectedPayment by remember { mutableStateOf("QRIS") }
+    var showQrisDialog by remember { mutableStateOf(false) }
     var uploadedFileName by remember { mutableStateOf<String?>(null) }
     var uploadedFileUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var isUploadingPayment by remember { mutableStateOf(false) }
@@ -165,7 +169,8 @@ fun TrackingScreen(
                     when (change) {
                         is PostgresAction.Update -> {
                             val updated = change.decodeRecord<Order>()
-                            if (updated.status != order?.status) {
+                            // "Siap" ditangani oleh watcher khusus di bawah (pesan lebih spesifik).
+                            if (updated.status != order?.status && updated.status != "Siap") {
                                 Toast.makeText(context, "Status pesanan berubah menjadi: ${updated.status}", Toast.LENGTH_LONG).show()
                             }
                             order = updated
@@ -204,6 +209,20 @@ fun TrackingScreen(
                 e.printStackTrace()
             }
         }
+    }
+
+    // Pemberitahuan in-app: begitu pesanan berpindah ke status "Siap"
+    // (dari realtime maupun polling), tampilkan notifikasi jelas ke pelanggan.
+    var prevStatus by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(order?.status) {
+        val current = order?.status
+        if (prevStatus != null && prevStatus != current && current == "Siap") {
+            val ot = order?.orderType ?: "Delivery"
+            val msg = if (ot == "Take Away") "🎉 Pesanan Anda sudah siap! Silakan diambil di kasir."
+                      else "🎉 Pesanan Anda sudah siap disajikan!"
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+        }
+        prevStatus = current
     }
 
     val activeStep = when (order?.status) {
@@ -385,6 +404,33 @@ fun TrackingScreen(
                     }
 
                     Column(modifier = Modifier.padding(16.dp)) {
+                        // Banner menonjol saat pesanan sudah siap.
+                        if (order?.status == "Siap") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFD1FAE5))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color(0xFF059669),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (orderType == "Take Away") "Pesanan sudah siap! Silakan diambil di kasir."
+                                           else "Pesanan sudah siap disajikan!",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF065F46)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
                         Text("Status: ${order?.status ?: "Pending"}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = DarkCharcoal)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
@@ -475,14 +521,14 @@ fun TrackingScreen(
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("Silakan pilih metode pembayaran dan unggah bukti transfer:", fontSize = 12.sp, color = DarkCharcoal)
-                        
+                        Text("Silakan pilih metode pembayaran:", fontSize = 12.sp, color = DarkCharcoal)
+
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            listOf("QRIS", "Transfer").forEach { method ->
+                            listOf("QRIS", "Transfer", "Tunai").forEach { method ->
                                 val isSelected = selectedPayment == method
                                 Box(
                                     modifier = Modifier
@@ -516,10 +562,10 @@ fun TrackingScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                val displayQrisUrl = if (qrisUrl.isNotBlank()) qrisUrl else "https://mtjyggxyjojcvcjxiblo.supabase.co/storage/v1/object/public/menu-images/qris_barcode.png"
                                 if (selectedPayment == "QRIS") {
                                     Text("Scan QRIS Resmi Dapoer Lavana", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    val displayQrisUrl = if (qrisUrl.isNotBlank()) qrisUrl else "https://mtjyggxyjojcvcjxiblo.supabase.co/storage/v1/object/public/menu-images/qris_barcode.png"
                                     AsyncImage(
                                         model = displayQrisUrl,
                                         contentDescription = "QRIS Barcode",
@@ -527,9 +573,12 @@ fun TrackingScreen(
                                             .size(150.dp)
                                             .clip(RoundedCornerShape(8.dp))
                                             .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
-                                            .background(Color.White),
+                                            .background(Color.White)
+                                            .clickable { showQrisDialog = true },
                                         contentScale = ContentScale.Fit
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Ketuk gambar untuk memperbesar", fontSize = 10.sp, color = Color.Gray)
                                     Spacer(modifier = Modifier.height(8.dp))
                                     var isDownloadingQris by remember { mutableStateOf(false) }
                                     val qrisDownloadScope = rememberCoroutineScope()
@@ -562,6 +611,22 @@ fun TrackingScreen(
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text("Unduh Gambar QRIS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                     }
+                                } else if (selectedPayment == "Tunai") {
+                                    Icon(
+                                        imageVector = Icons.Default.Payments,
+                                        contentDescription = null,
+                                        tint = OrangeJco,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Bayar Tunai di Tempat", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Pembayaran dilakukan langsung secara tunai saat pesanan diambil/diantar. Tidak perlu mengunggah bukti bayar.",
+                                        fontSize = 11.sp,
+                                        color = Color.Gray,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
                                 } else {
                                     Text("Transfer Ke Rekening Resmi", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = DarkCharcoal)
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -604,11 +669,6 @@ fun TrackingScreen(
                             }
                         }
                         
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Unggah Bukti Pembayaran (Opsional)", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 12.sp)
-                        Text("Boleh dilewati -- pembayaran akan dicek manual oleh admin.", fontSize = 11.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        
                         val imagePickerLauncher = rememberLauncherForActivityResult(
                             contract = ActivityResultContracts.GetContent()
                         ) { uri ->
@@ -617,23 +677,34 @@ fun TrackingScreen(
                                 uploadedFileName = "bukti_bayar_${orderId}_${System.currentTimeMillis()}.jpg"
                             }
                         }
-                        
-                        Button(
-                            onClick = { imagePickerLauncher.launch("image/*") },
-                            modifier = Modifier.fillMaxWidth().height(42.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = LightOrangeJco),
-                            border = BorderStroke(1.dp, OrangeJco)
-                        ) {
-                            Text(
-                                text = uploadedFileName ?: "Pilih Gambar Bukti Bayar",
-                                color = OrangeJco,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp
-                            )
-                        }
-                        
-                        if (uploadError != null) {
+
+                        // Unggah bukti tidak relevan untuk pembayaran tunai.
+                        if (selectedPayment != "Tunai") {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Unggah Bukti Pembayaran (Opsional)", fontWeight = FontWeight.Bold, color = DarkCharcoal, fontSize = 12.sp)
+                            Text("Boleh dilewati -- pembayaran akan dicek manual oleh admin.", fontSize = 11.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Button(
+                                onClick = { imagePickerLauncher.launch("image/*") },
+                                modifier = Modifier.fillMaxWidth().height(42.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = LightOrangeJco),
+                                border = BorderStroke(1.dp, OrangeJco)
+                            ) {
+                                Text(
+                                    text = uploadedFileName ?: "Pilih Gambar Bukti Bayar",
+                                    color = OrangeJco,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            if (uploadError != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(uploadError!!, color = Color.Red, fontSize = 11.sp)
+                            }
+                        } else if (uploadError != null) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(uploadError!!, color = Color.Red, fontSize = 11.sp)
                         }
@@ -681,9 +752,10 @@ fun TrackingScreen(
                                             }
                                         }
 
+                                        val methodValue = if (selectedPayment == "Tunai") "Tunai (Bayar di Tempat)" else selectedPayment
                                         SupabaseClient.db["orders"].update({
                                             set("payment_status", "Menunggu Verifikasi")
-                                            set("payment_method", selectedPayment)
+                                            set("payment_method", methodValue)
                                             if (publicUrl != null) {
                                                 set("payment_receipt_url", publicUrl)
                                             }
@@ -704,7 +776,9 @@ fun TrackingScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
                         ) {
                             Text(
-                                text = if (isUploadingPayment) "Mengirim..." else "Konfirmasi Pembayaran",
+                                text = if (isUploadingPayment) "Mengirim..."
+                                       else if (selectedPayment == "Tunai") "Konfirmasi Pesanan (Bayar Tunai)"
+                                       else "Konfirmasi Pembayaran",
                                 color = OnAccentDark,
                                 fontWeight = FontWeight.Bold
                             )
@@ -929,6 +1003,37 @@ fun TrackingScreen(
                         }
                     }
                 )
+            }
+
+            // Item D: QRIS diperbesar saat diketuk. Ketuk di mana saja untuk menutup.
+            if (showQrisDialog) {
+                val enlargedQrisUrl = if (qrisUrl.isNotBlank()) qrisUrl else "https://mtjyggxyjojcvcjxiblo.supabase.co/storage/v1/object/public/menu-images/qris_barcode.png"
+                Dialog(onDismissRequest = { showQrisDialog = false }) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.White)
+                            .clickable { showQrisDialog = false }
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("QRIS Resmi Dapoer Lavana", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkCharcoal)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        AsyncImage(
+                            model = enlargedQrisUrl,
+                            contentDescription = "QRIS Barcode Diperbesar",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White),
+                            contentScale = ContentScale.Fit
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Ketuk untuk menutup", fontSize = 11.sp, color = Color.Gray)
+                    }
+                }
             }
         }
     }

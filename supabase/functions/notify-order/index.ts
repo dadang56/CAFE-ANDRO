@@ -93,6 +93,8 @@ function statusMessage(status: string): { title: string; body: string } | null {
   switch (status) {
     case "Diproses":
       return { title: "Pesanan Dikonfirmasi", body: "Pesananmu sedang disiapkan di dapur." }
+    case "Siap":
+      return { title: "Pesanan Sudah Siap!", body: "Pesananmu sudah siap. Silakan diambil/ditunggu." }
     case "Diantar":
       return { title: "Pesanan Sedang Diantar", body: "Driver sedang menuju lokasimu." }
     case "Selesai":

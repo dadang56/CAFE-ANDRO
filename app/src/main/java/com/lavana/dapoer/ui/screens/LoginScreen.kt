@@ -350,11 +350,22 @@ fun LoginScreen(
                                                 this.password = password
                                             }
                                             CartManager.currentStaff = null
-                                            val currentAuthUser = SupabaseClient.auth.currentUserOrNull()
-                                            val uId = currentAuthUser?.id ?: java.util.UUID.randomUUID().toString()
-                                            saveSession(uId, inputClean, "Customer", null)
-                                            loginSuccess = true
-                                            onNavigateToCustomer()
+                                            // Ambil id auth secara andal (sesi maupun user). JANGAN membuat
+                                            // UUID acak bila auth berhasil -- id acak akan berbeda dari user_id
+                                            // yang tersimpan di pesanan, sehingga RIWAYAT PESANAN jadi kosong
+                                            // di sesi berikutnya. Lebih baik anggap gagal & jatuh ke fallback.
+                                            val uId = SupabaseClient.auth.currentUserOrNull()?.id
+                                                ?: SupabaseClient.auth.currentSessionOrNull()?.user?.id
+                                            if (uId != null) {
+                                                // Stabilkan id: set juga mockUser agar currentUserId konsisten
+                                                // walau sesi auth belum termuat / sempat null.
+                                                SupabaseClient.setMockUser(uId, inputClean)
+                                                saveSession(uId, inputClean, "Customer", null)
+                                                loginSuccess = true
+                                                onNavigateToCustomer()
+                                            } else {
+                                                authErrorMessage = "Sesi login tidak terbaca. Silakan coba lagi."
+                                            }
                                         } catch (authException: Exception) {
                                             // Simpan pesan asli agar bisa ditampilkan bila SEMUA jalur login gagal
                                             // (jangan ditelan diam-diam -- ini yang membuat diagnosa sulit sebelumnya).

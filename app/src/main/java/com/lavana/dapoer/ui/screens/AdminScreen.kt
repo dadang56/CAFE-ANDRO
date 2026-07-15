@@ -932,6 +932,7 @@ fun KasirOrderDialog(
     var orderType by remember { mutableStateOf("Dine In") }
     var payment by remember { mutableStateOf("Tunai") }
     var customerName by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
     val cart = remember { mutableStateMapOf<String, Int>() }
     var saving by remember { mutableStateOf(false) }
 
@@ -1010,6 +1011,35 @@ fun KasirOrderDialog(
                             unfocusedContainerColor = Color.White
                         )
                     )
+                    Spacer(Modifier.height(8.dp))
+                    // Cari menu agar kasir cepat melayani pelanggan di tempat.
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Cari menu...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = OrangeJco) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Hapus", tint = Color.Gray)
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = OrangeJco,
+                            unfocusedBorderColor = Color.LightGray,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        )
+                    )
+                }
+
+                val filteredMenu = remember(menu, searchQuery) {
+                    if (searchQuery.isBlank()) menu
+                    else menu.filter { it.name.contains(searchQuery.trim(), ignoreCase = true) }
                 }
 
                 // Daftar menu + stepper qty
@@ -1021,13 +1051,17 @@ fun KasirOrderDialog(
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                         Text("Belum ada menu tersedia.", color = Color.Gray)
                     }
+                } else if (filteredMenu.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text("Menu \"$searchQuery\" tidak ditemukan.", color = Color.Gray)
+                    }
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(menu) { item ->
+                        items(filteredMenu) { item ->
                             val qty = cart[item.id] ?: 0
                             Card(
                                 modifier = Modifier.fillMaxWidth(),

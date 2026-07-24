@@ -409,7 +409,11 @@ fun CheckoutScreen(
                                 try {
                                     val currentUserId = SupabaseClient.currentUserId
 
+                                    // Nomor order reset harian (null -> DB SERIAL yang menetapkan).
+                                    val dailyOrderNumber = SupabaseClient.nextDailyOrderNumber()
+
                                     val newOrder = Order(
+                                        orderNumber = dailyOrderNumber,
                                         userId = currentUserId,
                                         orderType = orderType,
                                         status = "Pending",

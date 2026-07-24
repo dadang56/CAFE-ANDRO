@@ -1125,7 +1125,10 @@ fun KasirOrderDialog(
                                     saving = true
                                     scope.launch {
                                         try {
+                                            // Nomor order reset harian (null -> DB SERIAL yang menetapkan).
+                                            val dailyOrderNumber = SupabaseClient.nextDailyOrderNumber()
                                             val order = Order(
+                                                orderNumber = dailyOrderNumber,
                                                 userId = null,
                                                 orderType = orderType,
                                                 status = "Selesai",

@@ -71,6 +71,39 @@ object SupabaseClient {
         }
     }
 
+    /**
+     * Nomor order yang RESET setiap hari (mulai dari 1 lagi tiap hari baru).
+     *
+     * Cara kerja: ambil nomor order TERBESAR di antara pesanan HARI INI, lalu +1.
+     * Batas "hari ini" sengaja disamakan dengan dashboard admin -- tanggal lokal
+     * perangkat (WIB) dibandingkan bagian tanggal `created_at` -- agar konsisten
+     * dengan hitungan "Pesanan hari ini". Filter `gte` di server hanya untuk
+     * memperkecil data yang diambil; kecocokan pasti ditentukan filter tanggal
+     * di sisi Kotlin.
+     *
+     * Mengembalikan null bila query gagal, sehingga pemanggil membiarkan kolom
+     * `order_number` kosong dan DB (SERIAL) yang menetapkan nomor global -- lebih
+     * aman daripada menggagalkan pesanan.
+     *
+     * Catatan: penomoran dihitung di sisi aplikasi (bukan atomik di DB), jadi dua
+     * pesanan yang dibuat pada detik yang sama BISA mendapat nomor sama. Untuk
+     * satu kasir hal ini praktis tak terjadi; `id` (UUID) tetap unik.
+     */
+    suspend fun nextDailyOrderNumber(): Int? {
+        return try {
+            val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                .format(java.util.Date())
+            val todays = db["orders"].select {
+                filter { gte("created_at", todayStr) }
+            }.decodeList<Order>()
+                .filter { (it.createdAt?.take(10) ?: "") == todayStr }
+            (todays.mapNotNull { it.orderNumber }.maxOrNull() ?: 0) + 1
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     var mockUserId: String? = null
     var mockUserEmail: String? = null
 

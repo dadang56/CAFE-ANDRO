@@ -1295,7 +1295,9 @@ fun AdminOrderCard(
             }
             Text("Total: Rp ${String.format("%,.0f", order.total)} | Pembayaran: ${order.paymentMethod} (${order.paymentStatus})", fontSize = 12.sp, color = Color.Gray)
             
-            if (order.status == "Diantar" || order.status == "Selesai") {
+            // Kurir hanya relevan untuk Delivery. Dine In / Take Away tidak butuh
+            // kurir, jadi jangan tampilkan "Kurir: Belum Ditugaskan" di situ.
+            if (isDelivery && (order.status == "Diantar" || order.status == "Selesai")) {
                 Text("Kurir: $assignedDriverName", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OrangeJco)
             }
             if (order.deliveryWithinTolerance == false) {

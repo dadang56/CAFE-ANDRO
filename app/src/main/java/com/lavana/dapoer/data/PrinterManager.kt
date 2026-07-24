@@ -201,8 +201,13 @@ object PrinterManager {
                         )
                         if (el.bold) out.write(CMD_BOLD_ON)
                         if (el.doubleHeight) out.write(CMD_DOUBLE_HEIGHT_ON)
-                        out.write(encode(el.text))
-                        out.write(byteArrayOf(0x0A))
+                        // Bungkus teks yang melebihi lebar kertas pada batas kata agar
+                        // tidak terpotong di tengah kata oleh hardware printer
+                        // (mis. "Kasir : Admin Demo (Dapoer Lavan" + "a)").
+                        for (line in wrapText(el.text, LINE_WIDTH)) {
+                            out.write(encode(line))
+                            out.write(byteArrayOf(0x0A))
+                        }
                         if (el.doubleHeight) out.write(CMD_DOUBLE_HEIGHT_OFF)
                         if (el.bold) out.write(CMD_BOLD_OFF)
                     }
@@ -287,6 +292,50 @@ object PrinterManager {
         } catch (e: Exception) {
             content.toByteArray(Charsets.ISO_8859_1)
         }
+    }
+
+    /**
+     * Pecah teks agar tiap baris tidak melebihi [width] karakter, memutus pada
+     * batas kata (spasi) bila memungkinkan. Baris yang sudah dipisah manual
+     * dengan '\n' (mis. dari format kiri-kanan) tetap dihormati. Kata tunggal
+     * yang lebih panjang dari [width] dipotong keras agar tetap muat.
+     */
+    private fun wrapText(text: String, width: Int): List<String> {
+        val result = mutableListOf<String>()
+        for (segment in text.split("\n")) {
+            if (segment.length <= width) {
+                result.add(segment)
+                continue
+            }
+            val line = StringBuilder()
+            for (word in segment.split(" ")) {
+                if (word.length > width) {
+                    // Kata tunggal terlalu panjang: keluarkan baris berjalan lalu potong keras.
+                    if (line.isNotEmpty()) {
+                        result.add(line.toString())
+                        line.setLength(0)
+                    }
+                    var rest = word
+                    while (rest.length > width) {
+                        result.add(rest.substring(0, width))
+                        rest = rest.substring(width)
+                    }
+                    if (rest.isNotEmpty()) line.append(rest)
+                    continue
+                }
+                val needed = if (line.isEmpty()) word.length else line.length + 1 + word.length
+                if (needed > width) {
+                    result.add(line.toString())
+                    line.setLength(0)
+                    line.append(word)
+                } else {
+                    if (line.isNotEmpty()) line.append(' ')
+                    line.append(word)
+                }
+            }
+            if (line.isNotEmpty()) result.add(line.toString())
+        }
+        return result
     }
 
     /**

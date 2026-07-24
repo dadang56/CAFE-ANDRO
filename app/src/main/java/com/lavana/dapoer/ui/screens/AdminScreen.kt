@@ -4403,7 +4403,9 @@ fun ManageCategoriesDialog(
 // ==========================================================
 // THERMAL RECEIPT BUILDER (58mm / 32 char width)
 // ==========================================================
-private const val RECEIPT_WIDTH = 32
+// Struk dicetak dengan Font B (~42 kolom di kertas 58mm), jadi perataan
+// kiri-kanan & garis pemisah memakai lebar 42 -- sinkron dengan PrinterManager.LINE_WIDTH.
+private const val RECEIPT_WIDTH = 42
 
 private fun receiptLineLR(left: String, right: String): String {
     val space = RECEIPT_WIDTH - left.length - right.length

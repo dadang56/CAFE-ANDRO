@@ -45,8 +45,18 @@ object PrinterManager {
     private const val KEY_MAC = "printer_mac"
     private const val KEY_NAME = "printer_name"
 
-    /** Lebar kertas 58mm = 32 karakter per baris (Font A). */
+    /** Lebar kertas 58mm pada Font A = 32 karakter per baris. Dipakai jalur
+     *  printText() polos (test print & cetak laporan). */
     const val LINE_WIDTH = 32
+
+    /**
+     * Lebar untuk STRUK (printReceipt) yang memakai Font B (font kecil/rapat):
+     * ~42 karakter per baris pada 58mm (384 dot / 9 dot per char), vs 32 di
+     * Font A. Font B dipilih agar baris panjang (mis. "Kasir : Admin Demo
+     * (Dapoer Lavana)", "Metode: QRIS (Menunggu Verifikasi)") muat dalam satu
+     * baris -- tidak turun/terpotong ke baris kedua.
+     */
+    const val RECEIPT_WIDTH = 42
 
     /** UUID standar untuk Serial Port Profile (SPP). */
     private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
@@ -60,8 +70,13 @@ object PrinterManager {
     private val CMD_ALIGN_LEFT = byteArrayOf(0x1B, 0x61, 0x00)           // ESC a 0
     private val CMD_ALIGN_CENTER = byteArrayOf(0x1B, 0x61, 0x01)         // ESC a 1
     private val CMD_ALIGN_RIGHT = byteArrayOf(0x1B, 0x61, 0x02)          // ESC a 2
-    private val CMD_DOUBLE_HEIGHT_ON = byteArrayOf(0x1B, 0x21, 0x10)     // ESC ! (double height)
-    private val CMD_DOUBLE_HEIGHT_OFF = byteArrayOf(0x1B, 0x21, 0x00)    // ESC ! (normal)
+    // Ganda-tinggi via GS ! (0x1D 0x21) -- BUKAN ESC ! (0x1B 0x21) -- karena ESC !
+    // ikut menyetel pilihan font (bit 0) sehingga akan me-reset Font B kembali ke
+    // Font A. GS ! hanya mengatur ukuran (perbesaran), tidak menyentuh font.
+    private val CMD_DOUBLE_HEIGHT_ON = byteArrayOf(0x1D, 0x21, 0x01)     // GS ! (tinggi x2)
+    private val CMD_DOUBLE_HEIGHT_OFF = byteArrayOf(0x1D, 0x21, 0x00)    // GS ! (normal)
+    private val CMD_FONT_B = byteArrayOf(0x1B, 0x4D, 0x01)               // ESC M 1 (font kecil, ~42 kolom)
+    private val CMD_FONT_A = byteArrayOf(0x1B, 0x4D, 0x00)               // ESC M 0 (font normal, 32 kolom)
 
     /** Lebar printer dalam dot untuk kertas 58mm @ 203dpi (umum di printer thermal murah). */
     private const val PRINTER_DOTS_WIDTH = 384
@@ -185,6 +200,9 @@ object PrinterManager {
 
             val out = socket.outputStream
             out.write(CMD_INIT)
+            // Seluruh struk memakai Font B (rapat, ~42 kolom) agar baris panjang muat
+            // satu baris. Logo (raster) tidak terpengaruh perintah font ini.
+            out.write(CMD_FONT_B)
 
             for (el in elements) {
                 when (el) {
@@ -204,7 +222,7 @@ object PrinterManager {
                         // Bungkus teks yang melebihi lebar kertas pada batas kata agar
                         // tidak terpotong di tengah kata oleh hardware printer
                         // (mis. "Kasir : Admin Demo (Dapoer Lavan" + "a)").
-                        for (line in wrapText(el.text, LINE_WIDTH)) {
+                        for (line in wrapText(el.text, RECEIPT_WIDTH)) {
                             out.write(encode(line))
                             out.write(byteArrayOf(0x0A))
                         }
@@ -213,7 +231,7 @@ object PrinterManager {
                     }
                     ReceiptElement.Divider -> {
                         out.write(CMD_ALIGN_LEFT)
-                        out.write(encode("-".repeat(LINE_WIDTH)))
+                        out.write(encode("-".repeat(RECEIPT_WIDTH)))
                         out.write(byteArrayOf(0x0A))
                     }
                     ReceiptElement.Spacer -> {

@@ -2,6 +2,9 @@ package com.lavana.dapoer.data
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import com.lavana.dapoer.ui.screens.LatLng
 import androidx.compose.runtime.mutableStateListOf
 
@@ -13,8 +16,104 @@ data class MenuItem(
     val price: Double,
     val category: String,
     @SerialName("image_url") val imageUrl: String = "",
-    @SerialName("is_available") val isAvailable: Boolean = true
+    @SerialName("is_available") val isAvailable: Boolean = true,
+    // JSON string berisi List<VariantGroup>. Null/kosong = produk tanpa varian.
+    // Disimpan sebagai kolom TEXT "variants" di tabel menu_items (lihat migration_menu_variants.sql).
+    val variants: String? = null
 )
+
+// Satu pilihan di dalam sebuah varian, mis. "Pedas" atau "Bawang Goreng".
+// price = tambahan harga (IDR). 0.0 = gratis / tidak menambah harga.
+@Serializable
+data class VariantOption(
+    val name: String,
+    val price: Double = 0.0
+)
+
+// Satu kelompok varian pada sebuah produk, mis. "Level Pedas" atau "Topping".
+// required = wajib dipilih pembeli. multiple = boleh pilih lebih dari 1 (checkbox),
+// false = maksimal pilih 1 (radio).
+@Serializable
+data class VariantGroup(
+    val name: String,
+    val required: Boolean = false,
+    val multiple: Boolean = false,
+    val options: List<VariantOption> = emptyList()
+)
+
+// ---------- PUSTAKA VARIAN (variant_groups + menu_item_variants) ----------
+// Varian dibuat sekali di tab "Varian" lalu diterapkan ke banyak produk, jadi
+// "Topping" tidak perlu diisi ulang di setiap menu.
+
+/** Satu baris tabel variant_groups. [options] adalah JSON List<VariantOption>. */
+@Serializable
+data class VariantGroupRow(
+    val id: String? = null,
+    val name: String,
+    val required: Boolean = false,
+    val multiple: Boolean = false,
+    @SerialName("is_active") val isActive: Boolean = true,
+    val options: String = "[]"
+)
+
+/** Satu baris tabel menu_item_variants: produk [menuItemId] memakai varian [groupId]. */
+@Serializable
+data class MenuItemVariantRow(
+    val id: String? = null,
+    @SerialName("menu_item_id") val menuItemId: String,
+    @SerialName("group_id") val groupId: String
+)
+
+private val variantJson = Json { ignoreUnknownKeys = true }
+
+/** Parse kolom options (JSON) jadi daftar pilihan. List kosong bila rusak/kosong. */
+fun VariantGroupRow.optionList(): List<VariantOption> {
+    if (options.isBlank()) return emptyList()
+    return try {
+        variantJson.decodeFromString<List<VariantOption>>(options)
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
+/** Bentuk yang dipakai pemilih varian & keranjang. */
+fun VariantGroupRow.toVariantGroup(): VariantGroup =
+    VariantGroup(name = name, required = required, multiple = multiple, options = optionList())
+
+/** Encode daftar pilihan jadi JSON untuk kolom options. */
+fun encodeVariantOptions(options: List<VariantOption>): String {
+    val cleaned = options.filter { it.name.isNotBlank() }.map { it.copy(name = it.name.trim()) }
+    return variantJson.encodeToString(cleaned)
+}
+
+// Parse kolom variants (JSON) menjadi daftar VariantGroup. Aman: mengembalikan
+// list kosong bila null/kosong/rusak, sehingga produk lama tanpa varian tetap jalan.
+fun MenuItem.getVariantGroups(): List<VariantGroup> {
+    val raw = variants
+    if (raw.isNullOrBlank()) return emptyList()
+    return try {
+        variantJson.decodeFromString<List<VariantGroup>>(raw)
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
+// Encode daftar VariantGroup menjadi JSON untuk disimpan. Membuang grup/pilihan
+// tanpa nama. Mengembalikan null bila tidak ada varian valid (agar kolom dibiarkan kosong).
+fun encodeVariantGroups(groups: List<VariantGroup>): String? {
+    val cleaned = groups
+        .map { g ->
+            g.copy(
+                name = g.name.trim(),
+                options = g.options
+                    .filter { it.name.isNotBlank() }
+                    .map { it.copy(name = it.name.trim()) }
+            )
+        }
+        .filter { it.name.isNotBlank() && it.options.isNotEmpty() }
+    if (cleaned.isEmpty()) return null
+    return variantJson.encodeToString(cleaned)
+}
 
 @Serializable
 data class FcmToken(

@@ -10,11 +10,31 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import java.util.UUID
+
+// Varian yang dipilih pembeli untuk satu baris keranjang, mis. group="Level Pedas", option="Pedas".
+data class SelectedVariant(
+    val group: String,
+    val option: String,
+    val price: Double = 0.0
+)
 
 data class CartItem(
     val menuItem: MenuItem,
-    val quantity: Int
+    val quantity: Int,
+    val selectedVariants: List<SelectedVariant> = emptyList(),
+    // Identitas unik satu baris keranjang. Dibutuhkan karena produk yang sama dengan
+    // pilihan varian berbeda menjadi baris terpisah, jadi tidak bisa lagi dikenali dari menuItem.id saja.
+    val lineId: String = UUID.randomUUID().toString()
 )
+
+// Harga satuan baris = harga dasar + total tambahan harga varian yang dipilih.
+fun CartItem.unitPrice(): Double = menuItem.price + selectedVariants.sumOf { it.price }
+fun CartItem.lineTotal(): Double = unitPrice() * quantity
+// Label ringkas untuk tampilan, mis. "Pedas, Bawang Goreng".
+fun CartItem.variantLabel(): String = selectedVariants.joinToString(", ") { it.option }
+// Catatan lengkap untuk struk/dapur, mis. "Level Pedas: Pedas, Topping: Bawang Goreng".
+fun CartItem.variantNotes(): String = selectedVariants.joinToString(", ") { "${it.group}: ${it.option}" }
 
 object CartManager {
     val items = mutableStateListOf<CartItem>()
@@ -83,8 +103,14 @@ object CartManager {
         activeSimulations.remove(orderId)
     }
 
+    // Kunci unik kombinasi varian, agar pilihan yang sama (urutan bebas) digabung ke satu baris.
+    private fun variantKey(vs: List<SelectedVariant>): String =
+        vs.map { "${it.group}=${it.option}" }.sorted().joinToString("|")
+
+    // Tambah produk TANPA varian (dipakai tombol "Beli" cepat & stepper produk polos).
+    // Hanya menyentuh baris tanpa-varian, tidak mengganggu baris yang punya varian.
     fun addItem(menuItem: MenuItem) {
-        val index = items.indexOfFirst { it.menuItem.id == menuItem.id }
+        val index = items.indexOfFirst { it.menuItem.id == menuItem.id && it.selectedVariants.isEmpty() }
         if (index != -1) {
             val current = items[index]
             items[index] = current.copy(quantity = current.quantity + 1)
@@ -93,8 +119,22 @@ object CartManager {
         }
     }
 
+    // Tambah produk DENGAN pilihan varian tertentu. Kombinasi varian yang sama digabung
+    // (quantity bertambah); kombinasi berbeda menjadi baris keranjang baru.
+    fun addConfiguredItem(menuItem: MenuItem, quantity: Int, selectedVariants: List<SelectedVariant>) {
+        if (quantity <= 0) return
+        val key = variantKey(selectedVariants)
+        val index = items.indexOfFirst { it.menuItem.id == menuItem.id && variantKey(it.selectedVariants) == key }
+        if (index != -1) {
+            val current = items[index]
+            items[index] = current.copy(quantity = current.quantity + quantity)
+        } else {
+            items.add(CartItem(menuItem, quantity, selectedVariants))
+        }
+    }
+
     fun removeItem(menuItem: MenuItem) {
-        val index = items.indexOfFirst { it.menuItem.id == menuItem.id }
+        val index = items.indexOfFirst { it.menuItem.id == menuItem.id && it.selectedVariants.isEmpty() }
         if (index != -1) {
             val current = items[index]
             if (current.quantity > 1) {
@@ -105,9 +145,39 @@ object CartManager {
         }
     }
 
+    // Operasi berbasis baris (lineId) untuk keranjang di Checkout — tidak ambigu walau ada
+    // beberapa baris dari produk yang sama dengan varian berbeda.
+    fun incrementLine(lineId: String) {
+        val index = items.indexOfFirst { it.lineId == lineId }
+        if (index != -1) {
+            val current = items[index]
+            items[index] = current.copy(quantity = current.quantity + 1)
+        }
+    }
+
+    fun decrementLine(lineId: String) {
+        val index = items.indexOfFirst { it.lineId == lineId }
+        if (index != -1) {
+            val current = items[index]
+            if (current.quantity > 1) {
+                items[index] = current.copy(quantity = current.quantity - 1)
+            } else {
+                items.removeAt(index)
+            }
+        }
+    }
+
+    fun deleteLine(lineId: String) {
+        val index = items.indexOfFirst { it.lineId == lineId }
+        if (index != -1) {
+            items.removeAt(index)
+        }
+    }
+
+    // Total kuantitas produk ini di keranjang, dijumlah lintas semua baris variannya
+    // (dipakai untuk badge jumlah pada kartu produk).
     fun getItemQuantity(menuItem: MenuItem): Int {
-        val index = items.indexOfFirst { it.menuItem.id == menuItem.id }
-        return if (index != -1) items[index].quantity else 0
+        return items.filter { it.menuItem.id == menuItem.id }.sumOf { it.quantity }
     }
 
     fun getItemsCount(): Int {
@@ -115,11 +185,11 @@ object CartManager {
     }
 
     fun getTotalPrice(): Double {
-        return items.sumOf { it.menuItem.price * it.quantity }
+        return items.sumOf { (it.menuItem.price + it.selectedVariants.sumOf { v -> v.price }) * it.quantity }
     }
 
     fun deleteItem(menuItem: MenuItem) {
-        val index = items.indexOfFirst { it.menuItem.id == menuItem.id }
+        val index = items.indexOfFirst { it.menuItem.id == menuItem.id && it.selectedVariants.isEmpty() }
         if (index != -1) {
             items.removeAt(index)
         }

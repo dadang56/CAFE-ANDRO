@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -454,7 +455,10 @@ fun CheckoutScreen(
                                                 orderId = orderId,
                                                 menuItemId = cartItem.menuItem.id,
                                                 quantity = cartItem.quantity,
-                                                priceAtOrder = cartItem.menuItem.price
+                                                // Harga satuan sudah termasuk tambahan varian.
+                                                priceAtOrder = cartItem.unitPrice(),
+                                                // Varian dipilih dicatat di notes → ikut tercetak di struk & slip dapur.
+                                                notes = if (cartItem.selectedVariants.isNotEmpty()) cartItem.variantNotes() else null
                                             )
                                         }
                                     } else {
@@ -790,9 +794,9 @@ fun CheckoutScreen(
                             if (index > 0) Spacer(modifier = Modifier.height(10.dp))
                             EditableCartItem(
                                 cartItem = cartItem,
-                                onAdd = { CartManager.addItem(cartItem.menuItem) },
-                                onRemove = { CartManager.removeItem(cartItem.menuItem) },
-                                onDeleteAll = { CartManager.deleteItem(cartItem.menuItem) }
+                                onAdd = { CartManager.incrementLine(cartItem.lineId) },
+                                onRemove = { CartManager.decrementLine(cartItem.lineId) },
+                                onDeleteAll = { CartManager.deleteLine(cartItem.lineId) }
                             )
                         }
                     }
@@ -1000,9 +1004,19 @@ fun EditableCartItem(
                     fontSize = 14.sp,
                     color = DarkCharcoal
                 )
+                if (cartItem.selectedVariants.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = cartItem.variantLabel(),
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Rp ${String.format("%,.0f", cartItem.menuItem.price)}",
+                    text = "Rp ${String.format("%,.0f", cartItem.unitPrice())}",
                     fontSize = 12.sp,
                     color = OrangeJco,
                     fontWeight = FontWeight.Bold

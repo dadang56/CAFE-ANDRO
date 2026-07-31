@@ -199,6 +199,7 @@ fun AdminEmptyState(
 @Composable
 fun TabAdminOrders() {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     var ordersList by remember { mutableStateOf<List<Order>>(emptyList()) }
     var driversList by remember { mutableStateOf<List<StaffAccount>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -208,6 +209,10 @@ fun TabAdminOrders() {
     var chatOrder by remember { mutableStateOf<Order?>(null) }
 
     var showKasirDialog by remember { mutableStateOf(false) }
+    // Pesanan kasir yang sedang diedit + item awalnya (dimuat dulu sebelum dialog dibuka).
+    var editingKasirOrder by remember { mutableStateOf<Order?>(null) }
+    var editingKasirItems by remember { mutableStateOf<List<OrderItem>>(emptyList()) }
+    var isLoadingEditItems by remember { mutableStateOf(false) }
     var selectedOrderForPrint by remember { mutableStateOf<Order?>(null) }
     var printOrderItems by remember { mutableStateOf<List<OrderItem>>(emptyList()) }
     var printMenuItemsMap by remember { mutableStateOf<Map<String, MenuItem>>(emptyMap()) }
@@ -345,6 +350,36 @@ fun TabAdminOrders() {
             )
         }
 
+        // Edit pesanan kasir: dialog yang sama, tapi terisi item pesanan tersebut.
+        // Setelah disimpan, struk langsung dibuka agar kasir bisa cetak ulang versi terbaru.
+        editingKasirOrder?.let { editOrder ->
+            KasirOrderDialog(
+                existingOrder = editOrder,
+                existingItems = editingKasirItems,
+                onDismiss = { editingKasirOrder = null },
+                onCreated = { updated ->
+                    editingKasirOrder = null
+                    refreshData()
+                    fetchPrintItems(updated)
+                }
+            )
+        }
+
+        if (isLoadingEditItems) {
+            Dialog(onDismissRequest = {}) {
+                Surface(shape = RoundedCornerShape(16.dp), color = Color.White) {
+                    Row(
+                        modifier = Modifier.padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(color = OrangeJco, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Memuat pesanan...", fontSize = 13.sp, color = DarkCharcoal)
+                    }
+                }
+            }
+        }
+
         if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -444,6 +479,46 @@ fun TabAdminOrders() {
                                         }) { filter { eq("id", order.id ?: "") } }
                                         refreshData()
                                     } catch (e: Exception) {}
+                                }
+                            },
+                            onEditKasirOrder = {
+                                // Muat item pesanan dulu, baru buka dialog dalam mode edit.
+                                isLoadingEditItems = true
+                                coroutineScope.launch {
+                                    try {
+                                        editingKasirItems = SupabaseClient.db["order_items"].select {
+                                            filter { eq("order_id", order.id ?: "") }
+                                        }.decodeList<OrderItem>()
+                                        editingKasirOrder = order
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Gagal memuat pesanan: ${e.localizedMessage}",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    } finally {
+                                        isLoadingEditItems = false
+                                    }
+                                }
+                            },
+                            onCancelOrder = {
+                                coroutineScope.launch {
+                                    try {
+                                        // Status "Dibatalkan" membuat pesanan keluar dari hitungan
+                                        // Total Penjualan & Pesanan Sukses (yang hanya menghitung "Selesai"),
+                                        // tapi barisnya tetap ada sebagai riwayat.
+                                        SupabaseClient.db["orders"].update({
+                                            set("status", "Dibatalkan")
+                                            set("payment_status", "Dibatalkan")
+                                        }) { filter { eq("id", order.id ?: "") } }
+                                        refreshData()
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Gagal membatalkan: ${e.localizedMessage}",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    }
                                 }
                             }
                         )
@@ -920,31 +995,118 @@ fun TabAdminOrders() {
 // ==========================================================
 // POS KASIR: buat pesanan langsung untuk pelanggan yang memesan di tempat
 // ==========================================================
+/**
+ * Satu baris keranjang POS kasir.
+ *
+ * Produk yang sama dengan pilihan varian berbeda menjadi baris terpisah, jadi
+ * kuncinya bukan lagi menuItemId saja. [unitPrice] sudah termasuk tambahan harga
+ * varian, dan [variantNotes] adalah teks yang ikut tersimpan ke order_items.notes
+ * ("Level Pedas: Pedas, Topping: Telur") sehingga varian tercetak di struk & slip dapur.
+ */
+private data class KasirLine(
+    val menuItemId: String,
+    val quantity: Int,
+    val unitPrice: Double,
+    val variantNotes: String?,
+    val lineId: String = UUID.randomUUID().toString()
+)
+
+/**
+ * Dialog POS kasir. Dipakai untuk DUA hal:
+ * - [existingOrder] == null  : buat pesanan baru.
+ * - [existingOrder] != null  : EDIT pesanan kasir yang sudah tersimpan (item,
+ *   jumlah, tipe, metode bayar, nama pemesan). [existingItems] mengisi keranjang awal.
+ */
 @Composable
 fun KasirOrderDialog(
+    existingOrder: Order? = null,
+    existingItems: List<OrderItem> = emptyList(),
     onDismiss: () -> Unit,
     onCreated: (Order) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
-    var menu by remember { mutableStateOf<List<MenuItem>>(emptyList()) }
+    val isEdit = existingOrder != null
+    var allMenu by remember { mutableStateOf<List<MenuItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
-    var orderType by remember { mutableStateOf("Dine In") }
-    var payment by remember { mutableStateOf("Tunai") }
-    var customerName by remember { mutableStateOf("") }
+    var orderType by remember { mutableStateOf(existingOrder?.orderType ?: "Dine In") }
+    // Hanya "Tunai"/"QRIS" yang punya tombol di dialog ini; metode lain (mis. hasil
+    // "Bayar di Tempat") jangan sampai membuat tidak ada tombol yang tersorot.
+    var payment by remember {
+        mutableStateOf(existingOrder?.paymentMethod?.takeIf { it == "Tunai" || it == "QRIS" } ?: "Tunai")
+    }
+    var customerName by remember { mutableStateOf(existingOrder?.customerName ?: "") }
     var searchQuery by remember { mutableStateOf("") }
-    val cart = remember { mutableStateMapOf<String, Int>() }
+    // Keranjang awal = item pesanan yang sedang diedit. Harga & catatan varian diambil
+    // APA ADANYA dari pesanan lama supaya total tidak bergeser kalau harga varian di
+    // pustaka sudah diubah setelah pesanan itu dibuat.
+    val cart = remember {
+        mutableStateListOf<KasirLine>().also { list ->
+            existingItems.forEach { oi ->
+                list.add(
+                    KasirLine(
+                        menuItemId = oi.menuItemId,
+                        quantity = oi.quantity,
+                        unitPrice = oi.priceAtOrder,
+                        variantNotes = oi.notes
+                    )
+                )
+            }
+        }
+    }
     var saving by remember { mutableStateOf(false) }
+    // Produk yang sedang dipilihkan variannya oleh kasir.
+    var menuForVariantPick by remember { mutableStateOf<MenuItem?>(null) }
 
     LaunchedEffect(Unit) {
-        menu = try {
-            SupabaseClient.db["menu_items"].select().decodeList<MenuItem>().filter { it.isAvailable }
+        allMenu = try {
+            SupabaseClient.db["menu_items"].select().decodeList<MenuItem>()
         } catch (e: Exception) { emptyList() }
+        // Pastikan pustaka varian siap sebelum kasir menekan produk bervarian.
+        if (!VariantLibrary.loaded) VariantLibrary.refresh()
         loading = false
     }
 
-    val subtotal = menu.sumOf { (cart[it.id] ?: 0) * it.price }
-    val totalQty = cart.values.sum()
+    // ---- Operasi keranjang berbasis baris ----
+    // Baris polos (tanpa varian) digabung per produk; baris bervarian digabung per
+    // kombinasi varian yang sama, jadi menekan "+" dua kali tidak membuat dua baris.
+    fun qtyOf(menuItemId: String): Int = cart.filter { it.menuItemId == menuItemId }.sumOf { it.quantity }
+
+    fun addPlain(item: MenuItem) {
+        val i = cart.indexOfFirst { it.menuItemId == item.id && it.variantNotes.isNullOrBlank() }
+        if (i != -1) cart[i] = cart[i].copy(quantity = cart[i].quantity + 1)
+        else cart.add(KasirLine(item.id, 1, item.price, null))
+    }
+
+    fun removePlain(item: MenuItem) {
+        val i = cart.indexOfFirst { it.menuItemId == item.id && it.variantNotes.isNullOrBlank() }
+        if (i == -1) return
+        if (cart[i].quantity > 1) cart[i] = cart[i].copy(quantity = cart[i].quantity - 1)
+        else cart.removeAt(i)
+    }
+
+    fun addConfigured(item: MenuItem, qty: Int, selected: List<SelectedVariant>) {
+        if (qty <= 0) return
+        val notes = selected.joinToString(", ") { "${it.group}: ${it.option}" }.ifBlank { null }
+        val unit = item.price + selected.sumOf { it.price }
+        val i = cart.indexOfFirst { it.menuItemId == item.id && it.variantNotes == notes && it.unitPrice == unit }
+        if (i != -1) cart[i] = cart[i].copy(quantity = cart[i].quantity + qty)
+        else cart.add(KasirLine(item.id, qty, unit, notes))
+    }
+
+    fun changeLineQty(line: KasirLine, delta: Int) {
+        val i = cart.indexOfFirst { it.lineId == line.lineId }
+        if (i == -1) return
+        val newQty = cart[i].quantity + delta
+        if (newQty <= 0) cart.removeAt(i) else cart[i] = cart[i].copy(quantity = newQty)
+    }
+
+    // Item yang sudah ada di pesanan tetap ditampilkan walau kini ditandai habis,
+    // supaya saat mengedit item tersebut tidak hilang diam-diam dari pesanan.
+    val menu = allMenu.filter { it.isAvailable || qtyOf(it.id) > 0 }
+
+    val subtotal = cart.sumOf { it.unitPrice * it.quantity }
+    val totalQty = cart.sumOf { it.quantity }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(modifier = Modifier.fillMaxSize(), color = LightGrayJco) {
@@ -962,8 +1124,14 @@ fun KasirOrderDialog(
                         }
                         Spacer(Modifier.width(4.dp))
                         Column {
-                            Text("Pesanan Baru (Kasir)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text("Pesan langsung di tempat, tanpa aplikasi", color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
+                            Text(
+                                if (isEdit) "Edit Pesanan #${existingOrder?.orderNumber ?: "-"}" else "Pesanan Baru (Kasir)",
+                                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp
+                            )
+                            Text(
+                                if (isEdit) "Ubah item, jumlah, atau metode bayar" else "Pesan langsung di tempat, tanpa aplikasi",
+                                color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp
+                            )
                         }
                     }
                 }
@@ -1062,29 +1230,101 @@ fun KasirOrderDialog(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(filteredMenu) { item ->
-                            val qty = cart[item.id] ?: 0
+                            val qty = qtyOf(item.id)
+                            val hasVariants = VariantLibrary.hasVariants(item)
+                            val itemLines = cart.filter { it.menuItemId == item.id && !it.variantNotes.isNullOrBlank() }
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color.White)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(item.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("Rp ${String.format("%,.0f", item.price)}", fontSize = 12.sp, color = OrangeJco)
-                                    }
-                                    IconButton(
-                                        onClick = { if (qty > 0) { if (qty - 1 == 0) cart.remove(item.id) else cart[item.id] = qty - 1 } },
-                                        enabled = qty > 0
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.Remove, contentDescription = "Kurang", tint = if (qty > 0) OrangeJco else Color.LightGray)
+                                        Column(Modifier.weight(1f)) {
+                                            Text(item.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text("Rp ${String.format("%,.0f", item.price)}", fontSize = 12.sp, color = OrangeJco)
+                                        }
+                                        if (hasVariants) {
+                                            // Produk bervarian: setiap penambahan bisa beda pilihan,
+                                            // jadi selalu lewat pemilih varian -- bukan stepper langsung.
+                                            if (qty > 0) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(50))
+                                                        .background(LightOrangeJco)
+                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                ) {
+                                                    Text("$qty", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OrangeJco)
+                                                }
+                                                Spacer(Modifier.width(6.dp))
+                                            }
+                                            Button(
+                                                onClick = { menuForVariantPick = item },
+                                                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Icon(Icons.Default.Tune, contentDescription = null, tint = OnAccentDark, modifier = Modifier.size(14.dp))
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("Pilih", color = OnAccentDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        } else {
+                                            IconButton(
+                                                onClick = { removePlain(item) },
+                                                enabled = qty > 0
+                                            ) {
+                                                Icon(Icons.Default.Remove, contentDescription = "Kurang", tint = if (qty > 0) OrangeJco else Color.LightGray)
+                                            }
+                                            Text("$qty", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkCharcoal, textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 22.dp))
+                                            IconButton(onClick = { addPlain(item) }) {
+                                                Icon(Icons.Default.Add, contentDescription = "Tambah", tint = OrangeJco)
+                                            }
+                                        }
                                     }
-                                    Text("$qty", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkCharcoal, textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 22.dp))
-                                    IconButton(onClick = { cart[item.id] = qty + 1 }) {
-                                        Icon(Icons.Default.Add, contentDescription = "Tambah", tint = OrangeJco)
+
+                                    // Baris varian yang sudah dipilih untuk produk ini.
+                                    itemLines.forEach { line ->
+                                        Divider(color = LightGrayJco)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 12.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text(
+                                                    line.variantNotes ?: "-",
+                                                    fontSize = 11.sp,
+                                                    color = Color.Gray,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    "Rp ${String.format("%,.0f", line.unitPrice)} / porsi",
+                                                    fontSize = 11.sp,
+                                                    color = OrangeJco,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                            IconButton(onClick = { changeLineQty(line, -1) }, modifier = Modifier.size(32.dp)) {
+                                                Icon(Icons.Default.Remove, contentDescription = "Kurang", tint = OrangeJco, modifier = Modifier.size(16.dp))
+                                            }
+                                            Text(
+                                                "${line.quantity}",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = DarkCharcoal,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.widthIn(min = 20.dp)
+                                            )
+                                            IconButton(onClick = { changeLineQty(line, 1) }, modifier = Modifier.size(32.dp)) {
+                                                Icon(Icons.Default.Add, contentDescription = "Tambah", tint = OrangeJco, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1125,34 +1365,90 @@ fun KasirOrderDialog(
                                     saving = true
                                     scope.launch {
                                         try {
-                                            // Nomor order reset harian (null -> DB SERIAL yang menetapkan).
-                                            val dailyOrderNumber = SupabaseClient.nextDailyOrderNumber()
-                                            val order = Order(
-                                                orderNumber = dailyOrderNumber,
-                                                userId = null,
-                                                orderType = orderType,
-                                                status = "Selesai",
-                                                subtotal = subtotal,
-                                                total = subtotal,
-                                                paymentMethod = payment,
-                                                paymentStatus = "Terbayar",
-                                                notes = "Pesanan langsung di kasir",
-                                                customerName = customerName.trim().ifBlank { null },
-                                                cashierUsername = CartManager.currentStaff?.username
-                                            )
-                                            val inserted = try {
-                                                SupabaseClient.db["orders"].insert(order) { select() }.decodeSingle<Order>()
-                                            } catch (e: Exception) {
-                                                if (e.message?.contains("customer_name", ignoreCase = true) == true) {
-                                                    SupabaseClient.db["orders"].insert(order.copy(customerName = null)) { select() }.decodeSingle<Order>()
-                                                } else throw e
+                                            val savedOrder: Order
+                                            if (isEdit) {
+                                                // ----- MODE EDIT: perbarui pesanan yang sudah ada -----
+                                                val orderId = existingOrder!!.id!!
+                                                val newName = customerName.trim().ifBlank { null }
+                                                try {
+                                                    SupabaseClient.db["orders"].update({
+                                                        set("order_type", orderType)
+                                                        set("subtotal", subtotal)
+                                                        set("total", subtotal)
+                                                        set("payment_method", payment)
+                                                        set("customer_name", newName)
+                                                    }) { filter { eq("id", orderId) } }
+                                                } catch (e: Exception) {
+                                                    // Pengaman bila kolom customer_name belum ada di DB.
+                                                    if (e.message?.contains("customer_name", ignoreCase = true) == true) {
+                                                        SupabaseClient.db["orders"].update({
+                                                            set("order_type", orderType)
+                                                            set("subtotal", subtotal)
+                                                            set("total", subtotal)
+                                                            set("payment_method", payment)
+                                                        }) { filter { eq("id", orderId) } }
+                                                    } else throw e
+                                                }
+                                                // Ganti seluruh baris item: hapus yang lama lalu tulis yang baru.
+                                                // Lebih sederhana & konsisten daripada diff per baris.
+                                                SupabaseClient.db["order_items"].delete { filter { eq("order_id", orderId) } }
+                                                val items = cart.map {
+                                                    OrderItem(
+                                                        orderId = orderId,
+                                                        menuItemId = it.menuItemId,
+                                                        quantity = it.quantity,
+                                                        priceAtOrder = it.unitPrice,
+                                                        notes = it.variantNotes
+                                                    )
+                                                }
+                                                if (items.isNotEmpty()) SupabaseClient.db["order_items"].insert(items)
+                                                savedOrder = existingOrder.copy(
+                                                    orderType = orderType,
+                                                    subtotal = subtotal,
+                                                    total = subtotal,
+                                                    paymentMethod = payment,
+                                                    customerName = newName
+                                                )
+                                                android.widget.Toast.makeText(context, "Pesanan #${savedOrder.orderNumber} diperbarui!", android.widget.Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                // ----- MODE BARU -----
+                                                // Nomor order reset harian (null -> DB SERIAL yang menetapkan).
+                                                val dailyOrderNumber = SupabaseClient.nextDailyOrderNumber()
+                                                val order = Order(
+                                                    orderNumber = dailyOrderNumber,
+                                                    userId = null,
+                                                    orderType = orderType,
+                                                    status = "Selesai",
+                                                    subtotal = subtotal,
+                                                    total = subtotal,
+                                                    paymentMethod = payment,
+                                                    paymentStatus = "Terbayar",
+                                                    notes = "Pesanan langsung di kasir",
+                                                    customerName = customerName.trim().ifBlank { null },
+                                                    cashierUsername = CartManager.currentStaff?.username
+                                                )
+                                                val inserted = try {
+                                                    SupabaseClient.db["orders"].insert(order) { select() }.decodeSingle<Order>()
+                                                } catch (e: Exception) {
+                                                    if (e.message?.contains("customer_name", ignoreCase = true) == true) {
+                                                        SupabaseClient.db["orders"].insert(order.copy(customerName = null)) { select() }.decodeSingle<Order>()
+                                                    } else throw e
+                                                }
+                                                val items = cart.map {
+                                                    OrderItem(
+                                                        orderId = inserted.id!!,
+                                                        menuItemId = it.menuItemId,
+                                                        quantity = it.quantity,
+                                                        priceAtOrder = it.unitPrice,
+                                                        // Varian ikut ke notes -> tercetak di struk & slip dapur.
+                                                        notes = it.variantNotes
+                                                    )
+                                                }
+                                                if (items.isNotEmpty()) SupabaseClient.db["order_items"].insert(items)
+                                                savedOrder = inserted
+                                                android.widget.Toast.makeText(context, "Pesanan kasir tersimpan!", android.widget.Toast.LENGTH_SHORT).show()
                                             }
-                                            val items = menu.filter { (cart[it.id] ?: 0) > 0 }.map {
-                                                OrderItem(orderId = inserted.id!!, menuItemId = it.id, quantity = cart[it.id]!!, priceAtOrder = it.price)
-                                            }
-                                            if (items.isNotEmpty()) SupabaseClient.db["order_items"].insert(items)
-                                            android.widget.Toast.makeText(context, "Pesanan kasir tersimpan!", android.widget.Toast.LENGTH_SHORT).show()
-                                            onCreated(inserted)
+                                            onCreated(savedOrder)
                                         } catch (e: Exception) {
                                             android.widget.Toast.makeText(context, "Gagal menyimpan: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
                                         } finally {
@@ -1168,9 +1464,18 @@ fun KasirOrderDialog(
                                 if (saving) {
                                     CircularProgressIndicator(color = OnAccentDark, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                                 } else {
-                                    Icon(Icons.Default.Print, contentDescription = null, tint = OnAccentDark, modifier = Modifier.size(18.dp))
+                                    Icon(
+                                        if (isEdit) Icons.Default.Save else Icons.Default.Print,
+                                        contentDescription = null,
+                                        tint = OnAccentDark,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Simpan & Cetak", color = OnAccentDark, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (isEdit) "Simpan Perubahan" else "Simpan & Cetak",
+                                        color = OnAccentDark,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -1179,7 +1484,33 @@ fun KasirOrderDialog(
             }
         }
     }
+
+    // Pemilih varian untuk kasir -- komponen yang sama dengan sisi pelanggan,
+    // jadi aturan wajib/opsional & tambahan harganya persis sama.
+    menuForVariantPick?.let { picked ->
+        VariantPickerDialog(
+            menuItem = picked,
+            onDismiss = { menuForVariantPick = null },
+            onConfirm = { selected, qty ->
+                addConfigured(picked, qty, selected)
+                menuForVariantPick = null
+            }
+        )
+    }
 }
+
+/**
+ * Pesanan kasir (POS) = dibuat dari dialog "Buat Pesanan (Kasir)": tanpa akun
+ * pelanggan, dan ditandai lewat cashier_username atau catatan bawaannya.
+ * Hanya pesanan ini yang boleh diedit/dibatalkan langsung oleh admin -- pesanan
+ * dari aplikasi pelanggan punya alur status & pembayarannya sendiri.
+ * Syarat userId == null menjaga pesanan tamu (guest) tetap tidak ikut terdeteksi
+ * karena tamu tidak punya cashier_username maupun catatan kasir.
+ */
+private fun Order.isKasirOrder(): Boolean =
+    userId == null &&
+        (!cashierUsername.isNullOrBlank() ||
+            notes?.contains("Pesanan langsung di kasir", ignoreCase = true) == true)
 
 @Composable
 fun AdminOrderCard(
@@ -1193,12 +1524,15 @@ fun AdminOrderCard(
     onRejectPayment: (String) -> Unit,
     onLocalPayment: () -> Unit,
     onMarkReady: () -> Unit,
-    onCompleteOrder: () -> Unit
+    onCompleteOrder: () -> Unit,
+    onEditKasirOrder: () -> Unit = {},
+    onCancelOrder: () -> Unit = {}
 ) {
     var showRejectDialog by remember { mutableStateOf(false) }
     var rejectReasonInput by remember { mutableStateOf("") }
     var showConfirmPaymentDialog by remember { mutableStateOf(false) }
     var showLocalPaymentDialog by remember { mutableStateOf(false) }
+    var showCancelDialog by remember { mutableStateOf(false) }
     val assignedDriverName = remember(order.driverId, drivers) {
         drivers.find { it.id == order.driverId }?.name ?: "Belum Ditugaskan"
     }
@@ -1367,6 +1701,42 @@ fun AdminOrderCard(
                 }
             }
 
+            // Baris khusus PESANAN KASIR: koreksi salah input (Edit) & pembatalan.
+            // Pesanan kasir langsung berstatus "Selesai" tanpa alur konfirmasi, jadi
+            // tanpa dua tombol ini kasir tidak punya cara membetulkan salah input.
+            if (order.isKasirOrder() && order.status != "Dibatalkan") {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onEditKasirOrder,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OrangeJco),
+                        border = BorderStroke(1.dp, OrangeJco),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(36.dp).weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Edit Pesanan", color = OrangeJco, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = { showCancelDialog = true },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = RedPromo),
+                        border = BorderStroke(1.dp, RedPromo),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(36.dp).weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Cancel, contentDescription = null, tint = RedPromo, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Batalkan", color = RedPromo, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                }
+            }
+
             // Baris 2: aksi status pesanan -- SELALU baris sendiri, full width, terbagi
             // rata (weight) agar tidak pernah terpotong berapa pun banyaknya tombol.
             when (order.status) {
@@ -1451,6 +1821,40 @@ fun AdminOrderCard(
                 else -> {}
             }
         }
+    }
+
+    if (showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Batalkan Pesanan #${order.orderNumber}?", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Text(
+                    "Pesanan sebesar Rp ${String.format("%,.0f", order.total)} akan ditandai " +
+                        "\"Dibatalkan\" dan tidak lagi dihitung sebagai penjualan hari ini. " +
+                        "Rincian pesanan tetap tersimpan sebagai riwayat.",
+                    fontSize = 13.sp,
+                    color = DarkCharcoal
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onCancelOrder()
+                        showCancelDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RedPromo)
+                ) {
+                    Text("Ya, Batalkan", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelDialog = false }) {
+                    Text("Tidak", color = Color.Gray)
+                }
+            }
+        )
     }
 
     if (showRejectDialog) {
@@ -1565,12 +1969,16 @@ fun TabAdminMenu() {
     var showManageCategoriesDialog by remember { mutableStateOf(false) }
     var selectedMenuForEdit by remember { mutableStateOf<MenuItem?>(null) }
     var menuToDelete by remember { mutableStateOf<MenuItem?>(null) }
+    // Sub-tab katalog: daftar produk vs pustaka varian.
+    var subTab by remember { mutableStateOf("Produk") }
+    var showAddVariantDialog by remember { mutableStateOf(false) }
 
     fun loadMenu(showLoadingSpinner: Boolean = false) {
         if (showLoadingSpinner) {
             isLoading = true
         }
         coroutineScope.launch {
+            // initializeMenuIfEmpty() sekaligus me-refresh VariantLibrary.
             menuList = SupabaseClient.initializeMenuIfEmpty()
             isLoading = false
         }
@@ -1601,38 +2009,103 @@ fun TabAdminMenu() {
                         color = Color.White,
                         fontFamily = FontFamily.SansSerif
                     )
-                    Text("Atur katalog & ketersediaan produk", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                    Text(
+                        if (subTab == "Varian") "Buat varian sekali, terapkan ke banyak produk"
+                        else "Atur katalog & ketersediaan produk",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(
-                        onClick = { showManageCategoriesDialog = true },
-                        border = BorderStroke(1.dp, Color.White),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Kategori", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Kategori", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = { showAddDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Tambah", tint = OnAccentDark, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Menu", color = OnAccentDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    if (subTab == "Produk") {
+                        OutlinedButton(
+                            onClick = { showManageCategoriesDialog = true },
+                            border = BorderStroke(1.dp, Color.White),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = "Kategori", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Kategori", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = { showAddDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Tambah", tint = OnAccentDark, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Menu", color = OnAccentDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Button(
+                            onClick = { showAddVariantDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Tambah", tint = OnAccentDark, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Varian", color = OnAccentDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
         }
 
-        if (isLoading) {
+        // Pemilih sub-tab: Produk | Varian
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White)
+                .border(1.dp, LightOrangeJco, RoundedCornerShape(12.dp))
+                .padding(4.dp)
+        ) {
+            listOf("Produk" to Icons.Default.RestaurantMenu, "Varian" to Icons.Default.Tune).forEach { (tab, icon) ->
+                val sel = subTab == tab
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (sel) OrangeJco else Color.Transparent)
+                        .clickable {
+                            subTab = tab
+                            // Jangan biarkan dialog "Varian Baru" muncul lagi sendiri
+                            // saat kembali ke tab ini.
+                            showAddVariantDialog = false
+                        }
+                        .padding(vertical = 9.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(icon, contentDescription = null, tint = if (sel) Color.White else OrangeJco, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (tab == "Varian") "Varian (${VariantLibrary.groups.size})" else tab,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (sel) Color.White else DarkCharcoal
+                    )
+                }
+            }
+        }
+
+        if (subTab == "Varian") {
+            AdminVariantLibrarySection(
+                modifier = Modifier.weight(1f),
+                menuList = menuList,
+                showCreateDialog = showAddVariantDialog,
+                onCreateDialogClose = { showAddVariantDialog = false },
+                onRefresh = { loadMenu(showLoadingSpinner = false) }
+            )
+        } else if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(color = OrangeJco)
@@ -1754,7 +2227,7 @@ fun TabAdminMenu() {
         AddOrEditMenuDialog(
             item = null,
             onDismiss = { showAddDialog = false },
-            onSave = { name, category, price, desc, imageUrl, isAvailable ->
+            onSave = { name, category, price, desc, imageUrl, isAvailable, variants ->
                 coroutineScope.launch {
                     try {
                         val newItem = MenuItem(
@@ -1764,9 +2237,18 @@ fun TabAdminMenu() {
                             price = price,
                             description = desc,
                             imageUrl = imageUrl,
-                            isAvailable = isAvailable
+                            isAvailable = isAvailable,
+                            variants = variants
                         )
-                        SupabaseClient.db["menu_items"].insert(newItem)
+                        // Pengaman: bila kolom "variants" belum ada di DB (migrasi belum
+                        // dijalankan), ulangi insert tanpa varian agar menu tetap tersimpan.
+                        try {
+                            SupabaseClient.db["menu_items"].insert(newItem)
+                        } catch (e: Exception) {
+                            if (e.message?.contains("variants", ignoreCase = true) == true) {
+                                SupabaseClient.db["menu_items"].insert(newItem.copy(variants = null))
+                            } else throw e
+                        }
                         showAddDialog = false
                         loadMenu(showLoadingSpinner = false)
                     } catch (e: Exception) {
@@ -1783,18 +2265,37 @@ fun TabAdminMenu() {
         AddOrEditMenuDialog(
             item = selectedMenuForEdit,
             onDismiss = { selectedMenuForEdit = null },
-            onSave = { name, category, price, desc, imageUrl, isAvailable ->
+            onSave = { name, category, price, desc, imageUrl, isAvailable, variants ->
                 coroutineScope.launch {
+                    val editId = selectedMenuForEdit?.id ?: ""
                     try {
-                        SupabaseClient.db["menu_items"].update({
-                            set("name", name)
-                            set("category", category)
-                            set("price", price)
-                            set("description", desc)
-                            set("image_url", imageUrl)
-                            set("is_available", isAvailable)
-                        }) {
-                            filter { eq("id", selectedMenuForEdit?.id ?: "") }
+                        // Pengaman: bila kolom "variants" belum ada di DB, ulangi update
+                        // tanpa set("variants") agar edit menu lain tetap tersimpan.
+                        try {
+                            SupabaseClient.db["menu_items"].update({
+                                set("name", name)
+                                set("category", category)
+                                set("price", price)
+                                set("description", desc)
+                                set("image_url", imageUrl)
+                                set("is_available", isAvailable)
+                                set("variants", variants)
+                            }) {
+                                filter { eq("id", editId) }
+                            }
+                        } catch (e: Exception) {
+                            if (e.message?.contains("variants", ignoreCase = true) == true) {
+                                SupabaseClient.db["menu_items"].update({
+                                    set("name", name)
+                                    set("category", category)
+                                    set("price", price)
+                                    set("description", desc)
+                                    set("image_url", imageUrl)
+                                    set("is_available", isAvailable)
+                                }) {
+                                    filter { eq("id", editId) }
+                                }
+                            } else throw e
                         }
                         selectedMenuForEdit = null
                         loadMenu(showLoadingSpinner = false)
@@ -1862,11 +2363,31 @@ fun TabAdminMenu() {
     }
 }
 
+// Draft (state UI) untuk satu pilihan varian di editor admin. price disimpan sebagai
+// String agar mudah diketik; dikonversi ke Double saat simpan.
+class VariantOptionDraft(name: String = "", price: String = "") {
+    var name by mutableStateOf(name)
+    var price by mutableStateOf(price)
+}
+
+// Draft (state UI) untuk satu grup varian di editor admin.
+class VariantGroupDraft(
+    name: String = "",
+    required: Boolean = false,
+    multiple: Boolean = false,
+    options: List<VariantOptionDraft> = listOf(VariantOptionDraft())
+) {
+    var name by mutableStateOf(name)
+    var required by mutableStateOf(required)
+    var multiple by mutableStateOf(multiple)
+    val options = mutableStateListOf<VariantOptionDraft>().also { it.addAll(options) }
+}
+
 @Composable
 fun AddOrEditMenuDialog(
     item: MenuItem?,
     onDismiss: () -> Unit,
-    onSave: (String, String, Double, String, String, Boolean) -> Unit
+    onSave: (String, String, Double, String, String, Boolean, String?) -> Unit
 ) {
     var name by remember { mutableStateOf(item?.name ?: "") }
     var category by remember { mutableStateOf(item?.category ?: "Donuts") }
@@ -2046,6 +2567,53 @@ fun AddOrEditMenuDialog(
                         )
                     )
                 }
+
+                // ---------------- Varian Produk (hanya ringkasan) ----------------
+                // Varian TIDAK diisi di sini: sumbernya satu, yaitu pustaka varian di
+                // tab "Varian". Dua tempat pengisian akan bikin dua sumber kebenaran.
+                Spacer(modifier = Modifier.height(8.dp))
+                Divider(color = LightOrangeJco)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Varian Produk", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkCharcoal)
+                if (item == null) {
+                    Text(
+                        "Simpan produk ini dulu, lalu terapkan varian dari tab \"Varian\".",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                } else {
+                    val appliedGroups = VariantLibrary.groupsFor(item)
+                    if (appliedGroups.isEmpty()) {
+                        Text(
+                            "Belum ada varian. Buka tab \"Varian\" → pilih varian → \"Atur Produk\" untuk menerapkannya ke produk ini.",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    } else {
+                        Text(
+                            "Diatur dari tab \"Varian\":",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        appliedGroups.forEach { g ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Tune,
+                                    contentDescription = null,
+                                    tint = OrangeJco,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "${g.name} — ${g.options.size} pilihan${if (g.required) " • wajib" else ""}",
+                                    fontSize = 12.sp,
+                                    color = DarkCharcoal
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -2054,7 +2622,8 @@ fun AddOrEditMenuDialog(
                     val priceVal = price.toDoubleOrNull() ?: 0.0
                     val originalPriceVal = originalPriceInput.toDoubleOrNull()
                     val finalDesc = createDescriptionWithOriginalPrice(desc, originalPriceVal)
-                    onSave(name, category, priceVal, finalDesc, imageUrl, isAvailable)
+                    // Kolom per-produk diteruskan apa adanya -- dialog ini tidak lagi mengubahnya.
+                    onSave(name, category, priceVal, finalDesc, imageUrl, isAvailable, item?.variants)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                 shape = RoundedCornerShape(14.dp)
@@ -2066,6 +2635,608 @@ fun AddOrEditMenuDialog(
             TextButton(onClick = onDismiss) {
                 Text("Batal", color = Color.Gray)
             }
+        }
+    )
+}
+
+// Editor satu grup varian di dialog admin (nama, wajib/opsional, metode pilih, daftar pilihan).
+@Composable
+fun VariantGroupEditor(
+    draft: VariantGroupDraft,
+    // null = tanpa tombol hapus (dipakai saat editor jadi isi satu dialog penuh).
+    onRemove: (() -> Unit)? = null
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = LightGrayJco),
+        border = BorderStroke(1.dp, LightOrangeJco)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = draft.name,
+                    onValueChange = { draft.name = it },
+                    label = { Text("Nama Varian") },
+                    placeholder = { Text("Mis. Level Pedas") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                if (onRemove != null) {
+                    IconButton(onClick = onRemove) {
+                        Icon(Icons.Default.Delete, contentDescription = "Hapus varian", tint = Color.Red)
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Wajib dipilih", fontSize = 13.sp, color = DarkCharcoal)
+                Switch(
+                    checked = draft.required,
+                    onCheckedChange = { draft.required = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = ForestGreen,
+                        checkedTrackColor = ForestGreen.copy(alpha = 0.5f)
+                    )
+                )
+            }
+
+            Text("Metode pilih varian", fontSize = 12.sp, color = Color.Gray)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { draft.multiple = false },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = !draft.multiple,
+                    onClick = { draft.multiple = false },
+                    colors = RadioButtonDefaults.colors(selectedColor = OrangeJco)
+                )
+                Text("Maks. Pilih 1", fontSize = 13.sp, color = DarkCharcoal)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { draft.multiple = true },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = draft.multiple,
+                    onClick = { draft.multiple = true },
+                    colors = RadioButtonDefaults.colors(selectedColor = OrangeJco)
+                )
+                Text("Boleh Lebih dari 1", fontSize = 13.sp, color = DarkCharcoal)
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Pilihan", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkCharcoal)
+            draft.options.forEachIndexed { oi, opt ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedTextField(
+                        value = opt.name,
+                        onValueChange = { opt.name = it },
+                        label = { Text("Pilihan") },
+                        placeholder = { Text("Mis. Pedas") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = opt.price,
+                        onValueChange = { opt.price = it.filter { c -> c.isDigit() } },
+                        label = { Text("+Rp") },
+                        placeholder = { Text("0") },
+                        singleLine = true,
+                        modifier = Modifier.width(96.dp)
+                    )
+                    IconButton(
+                        onClick = { if (draft.options.size > 1) draft.options.removeAt(oi) },
+                        enabled = draft.options.size > 1
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Hapus pilihan",
+                            tint = if (draft.options.size > 1) Color.Red else Color.LightGray
+                        )
+                    }
+                }
+            }
+
+            TextButton(onClick = { draft.options.add(VariantOptionDraft()) }) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Tambah Pilihan", color = OrangeJco, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+// ==========================================================
+// PUSTAKA VARIAN (tab "Varian" di Kelola Menu)
+// ==========================================================
+/**
+ * Daftar varian di pustaka: satu kartu per varian dengan toggle aktif, jumlah
+ * pilihan, jumlah produk yang memakainya, dan tombol untuk mengubah/menerapkan.
+ */
+@Composable
+fun AdminVariantLibrarySection(
+    modifier: Modifier = Modifier,
+    menuList: List<MenuItem>,
+    // Dipicu tombol "+ Varian" di header TabAdminMenu.
+    showCreateDialog: Boolean,
+    onCreateDialogClose: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var editingGroup by remember { mutableStateOf<VariantGroupRow?>(null) }
+    var assigningGroup by remember { mutableStateOf<VariantGroupRow?>(null) }
+    var deletingGroup by remember { mutableStateOf<VariantGroupRow?>(null) }
+
+    fun reload() {
+        scope.launch {
+            VariantLibrary.refresh()
+            onRefresh()
+        }
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (!VariantLibrary.tablesReady) {
+            // Jangan tampilkan daftar kosong yang menyesatkan: tabelnya memang belum ada.
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF4E5))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.WarningAmber, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Tabel varian belum ada di database", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Buka Supabase Dashboard → SQL Editor, jalankan isi file " +
+                            "supabase/migration_variant_library.sql, lalu tekan Muat Ulang.",
+                        fontSize = 12.sp,
+                        color = DarkCharcoal
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { reload() },
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = OnAccentDark, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Muat Ulang", color = OnAccentDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+            return@Column
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (VariantLibrary.groups.isEmpty()) {
+                item {
+                    AdminEmptyState(
+                        icon = Icons.Default.Tune,
+                        title = "Belum ada varian",
+                        subtitle = "Tekan tombol Varian di atas untuk membuat varian pertama, mis. \"Level Pedas\" atau \"Topping\"."
+                    )
+                }
+            }
+            items(VariantLibrary.groups, key = { it.id ?: it.name }) { group ->
+                val optionCount = group.optionList().size
+                val productCount = group.id?.let { VariantLibrary.productCount(it) } ?: 0
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                group.name,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = DarkCharcoal,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Switch(
+                                checked = group.isActive,
+                                onCheckedChange = { active ->
+                                    val gid = group.id ?: return@Switch
+                                    scope.launch {
+                                        try {
+                                            SupabaseClient.db["variant_groups"].update({
+                                                set("is_active", active)
+                                            }) { filter { eq("id", gid) } }
+                                            VariantLibrary.refresh()
+                                        } catch (e: Exception) {
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "Gagal mengubah status: ${e.localizedMessage}",
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = ForestGreen
+                                )
+                            )
+                            IconButton(onClick = { deletingGroup = group }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Hapus varian", tint = RedPromo, modifier = Modifier.size(20.dp))
+                            }
+                        }
+
+                        Text(
+                            buildString {
+                                append("$optionCount Pilihan")
+                                append(" - ")
+                                append(if (group.required) "Wajib" else "Opsional")
+                                append(if (group.multiple) " - Boleh >1" else " - Maks 1")
+                            },
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                        if (!group.isActive) {
+                            Spacer(Modifier.height(4.dp))
+                            Text("Non-aktif - tidak ditawarkan ke pembeli", fontSize = 11.sp, color = RedPromo, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Divider(color = LightOrangeJco)
+                        Spacer(Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Diterapkan ke $productCount produk",
+                                fontSize = 13.sp,
+                                color = DarkCharcoal,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = { editingGroup = group }) {
+                                Text("Ubah", color = Color.Gray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                            TextButton(onClick = { assigningGroup = group }) {
+                                Text("Atur Produk", color = OrangeJco, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showCreateDialog) {
+        VariantGroupDialog(
+            existing = null,
+            onDismiss = onCreateDialogClose,
+            onSaved = { onCreateDialogClose(); reload() }
+        )
+    }
+    editingGroup?.let { g ->
+        VariantGroupDialog(
+            existing = g,
+            onDismiss = { editingGroup = null },
+            onSaved = { editingGroup = null; reload() }
+        )
+    }
+    assigningGroup?.let { g ->
+        AssignVariantToProductsDialog(
+            group = g,
+            menuList = menuList,
+            onDismiss = { assigningGroup = null },
+            onSaved = { assigningGroup = null; reload() }
+        )
+    }
+    deletingGroup?.let { g ->
+        AlertDialog(
+            onDismissRequest = { deletingGroup = null },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Hapus varian \"${g.name}\"?", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Text(
+                    "Varian ini akan dihapus dari pustaka dan dari semua produk yang memakainya. " +
+                        "Pesanan lama tidak terpengaruh karena variannya sudah tercatat di catatan pesanan.",
+                    fontSize = 13.sp,
+                    color = DarkCharcoal
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val gid = g.id
+                        deletingGroup = null
+                        if (gid != null) {
+                            scope.launch {
+                                try {
+                                    // Baris di menu_item_variants ikut terhapus lewat ON DELETE CASCADE.
+                                    SupabaseClient.db["variant_groups"].delete { filter { eq("id", gid) } }
+                                    VariantLibrary.refresh()
+                                    onRefresh()
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Gagal menghapus: ${e.localizedMessage}",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RedPromo)
+                ) {
+                    Text("Ya, Hapus", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingGroup = null }) { Text("Batal", color = Color.Gray) }
+            }
+        )
+    }
+}
+
+/** Dialog buat/ubah satu varian di pustaka. */
+@Composable
+fun VariantGroupDialog(
+    existing: VariantGroupRow?,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var saving by remember { mutableStateOf(false) }
+    val draft = remember(existing?.id) {
+        VariantGroupDraft(
+            name = existing?.name ?: "",
+            required = existing?.required ?: false,
+            multiple = existing?.multiple ?: false,
+            options = (existing?.optionList() ?: emptyList())
+                .map { VariantOptionDraft(it.name, if (it.price > 0) it.price.toInt().toString() else "") }
+                .ifEmpty { listOf(VariantOptionDraft()) }
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color.White,
+        title = {
+            Text(
+                if (existing == null) "Varian Baru" else "Ubah Varian",
+                fontWeight = FontWeight.Bold,
+                color = DarkCharcoal
+            )
+        },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "Mis. \"Level Pedas\" atau \"Topping\". Setelah disimpan, terapkan ke produk lewat \"Atur Produk\".",
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+                Spacer(Modifier.height(10.dp))
+                VariantGroupEditor(draft = draft)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val nm = draft.name.trim()
+                    val opts = draft.options.mapNotNull { o ->
+                        val n = o.name.trim()
+                        if (n.isEmpty()) null else VariantOption(n, o.price.toDoubleOrNull() ?: 0.0)
+                    }
+                    if (nm.isEmpty() || opts.isEmpty()) {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Nama varian dan minimal 1 pilihan harus diisi.",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                        return@Button
+                    }
+                    saving = true
+                    scope.launch {
+                        try {
+                            val optionsJson = encodeVariantOptions(opts)
+                            val existingId = existing?.id
+                            if (existingId == null) {
+                                SupabaseClient.db["variant_groups"].insert(
+                                    VariantGroupRow(
+                                        name = nm,
+                                        required = draft.required,
+                                        multiple = draft.multiple,
+                                        isActive = true,
+                                        options = optionsJson
+                                    )
+                                )
+                            } else {
+                                SupabaseClient.db["variant_groups"].update({
+                                    set("name", nm)
+                                    set("required", draft.required)
+                                    set("multiple", draft.multiple)
+                                    set("options", optionsJson)
+                                }) { filter { eq("id", existingId) } }
+                            }
+                            onSaved()
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Gagal menyimpan varian: ${e.localizedMessage}",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        } finally {
+                            saving = false
+                        }
+                    }
+                },
+                enabled = !saving,
+                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                if (saving) {
+                    CircularProgressIndicator(color = OnAccentDark, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                } else {
+                    Text("Simpan", color = OnAccentDark, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) }
+        }
+    )
+}
+
+/** Dialog "Atur Produk": pilih produk mana saja yang memakai varian ini. */
+@Composable
+fun AssignVariantToProductsDialog(
+    group: VariantGroupRow,
+    menuList: List<MenuItem>,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var saving by remember { mutableStateOf(false) }
+    var search by remember { mutableStateOf("") }
+    val initial = remember(group.id) { group.id?.let { VariantLibrary.productIdsFor(it) } ?: emptySet() }
+    val checked = remember(group.id) { mutableStateListOf<String>().also { it.addAll(initial) } }
+
+    val filtered = menuList.filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color.White,
+        title = {
+            Column {
+                Text("Atur Produk", fontWeight = FontWeight.Bold, color = DarkCharcoal)
+                Text(
+                    "Varian \"${group.name}\" akan muncul di produk yang dicentang",
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+            }
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    placeholder = { Text("Cari produk...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = OrangeJco) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
+                Text("${checked.size} produk dipilih", fontSize = 12.sp, color = OrangeJco, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                if (filtered.isEmpty()) {
+                    Text("Produk tidak ditemukan.", fontSize = 12.sp, color = Color.Gray)
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                        items(filtered, key = { it.id }) { item ->
+                            val isChecked = checked.contains(item.id)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        if (isChecked) checked.remove(item.id) else checked.add(item.id)
+                                    }
+                                    .padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Klik ditangani Row agar tidak ter-toggle dua kali.
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(checkedColor = OrangeJco)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(item.name, fontSize = 13.sp, color = DarkCharcoal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(item.category, fontSize = 10.sp, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val gid = group.id ?: return@Button
+                    saving = true
+                    scope.launch {
+                        try {
+                            val target = checked.toSet()
+                            val toAdd = target - initial
+                            val toRemove = initial - target
+                            if (toAdd.isNotEmpty()) {
+                                SupabaseClient.db["menu_item_variants"].insert(
+                                    toAdd.map { MenuItemVariantRow(menuItemId = it, groupId = gid) }
+                                )
+                            }
+                            // Hapus satu per satu: PostgREST tidak punya "delete where in list"
+                            // lewat builder ini, dan jumlahnya kecil (per produk yang dilepas).
+                            toRemove.forEach { menuId ->
+                                SupabaseClient.db["menu_item_variants"].delete {
+                                    filter {
+                                        eq("group_id", gid)
+                                        eq("menu_item_id", menuId)
+                                    }
+                                }
+                            }
+                            onSaved()
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Gagal menyimpan: ${e.localizedMessage}",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        } finally {
+                            saving = false
+                        }
+                    }
+                },
+                enabled = !saving,
+                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                if (saving) {
+                    CircularProgressIndicator(color = OnAccentDark, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                } else {
+                    Text("Simpan", color = OnAccentDark, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Batal", color = Color.Gray) }
         }
     )
 }
@@ -4404,11 +5575,13 @@ fun ManageCategoriesDialog(
 }
 
 // ==========================================================
-// THERMAL RECEIPT BUILDER (58mm / 32 char width)
+// THERMAL RECEIPT BUILDER (58mm, Font B)
 // ==========================================================
-// Struk dicetak dengan Font B (~42 kolom di kertas 58mm), jadi perataan
-// kiri-kanan & garis pemisah memakai lebar 42 -- sinkron dengan PrinterManager.LINE_WIDTH.
-private const val RECEIPT_WIDTH = 42
+// Perataan kiri-kanan di sini HARUS memakai lebar yang sama dengan yang dipakai
+// PrinterManager saat mencetak & membungkus baris; kalau tidak, baris kiri-kanan
+// jadi lebih lebar dari kertas lalu dibungkus/terpotong. Karena itu diambil
+// langsung dari PrinterManager.RECEIPT_WIDTH, tidak ditulis ulang.
+private val RECEIPT_WIDTH = PrinterManager.RECEIPT_WIDTH
 
 private fun receiptLineLR(left: String, right: String): String {
     val space = RECEIPT_WIDTH - left.length - right.length

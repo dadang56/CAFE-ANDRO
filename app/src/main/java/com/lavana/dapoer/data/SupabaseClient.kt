@@ -64,6 +64,10 @@ object SupabaseClient {
             }
             val fetched = db["menu_items"].select().decodeList<MenuItem>()
             syncDynamicCategories(fetched)
+            // Pustaka varian ikut dimuat di sini agar setiap layar yang menampilkan
+            // menu (pelanggan, POS kasir, admin) langsung tahu produk mana bervarian.
+            // Kegagalannya ditangani di dalam refresh() dan tidak menggagalkan daftar menu.
+            VariantLibrary.refresh()
             fetched
         } catch (e: Exception) {
             e.printStackTrace()

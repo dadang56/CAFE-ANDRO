@@ -7,6 +7,8 @@
 DROP TABLE IF EXISTS public.order_items CASCADE;
 DROP TABLE IF EXISTS public.orders CASCADE;
 DROP TABLE IF EXISTS public.settings CASCADE;
+DROP TABLE IF EXISTS public.menu_item_variants CASCADE;
+DROP TABLE IF EXISTS public.variant_groups CASCADE;
 DROP TABLE IF EXISTS public.menu_items CASCADE;
 DROP TABLE IF EXISTS public.staff_accounts CASCADE;
 DROP TABLE IF EXISTS public.promos CASCADE;
@@ -37,12 +39,44 @@ CREATE TABLE public.menu_items (
     category TEXT NOT NULL, -- 'Kopi', 'Cemilan', 'Makanan', dll.
     image_url TEXT,
     is_available BOOLEAN DEFAULT TRUE NOT NULL,
+    variants TEXT, -- JSON List<VariantGroup> (Level Pedas, Topping, dll). NULL = tanpa varian.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Menu dapat dibaca siapa saja" ON public.menu_items FOR SELECT USING (true);
 CREATE POLICY "Menu dapat diakses penuh oleh siapa saja" ON public.menu_items FOR ALL USING (true);
+
+-- 2b. Pustaka Varian: varian dibuat sekali lalu diterapkan ke banyak produk.
+-- (Lihat supabase/migration_variant_library.sql untuk memasang ini di DB lama.)
+CREATE TABLE public.variant_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    required BOOLEAN NOT NULL DEFAULT FALSE,  -- wajib dipilih pembeli
+    multiple BOOLEAN NOT NULL DEFAULT FALSE,  -- TRUE = boleh pilih >1 (checkbox), FALSE = maks 1 (radio)
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,  -- non-aktif = tidak ditawarkan ke pembeli
+    options TEXT NOT NULL DEFAULT '[]',       -- JSON List<VariantOption>: [{"name":"Pedas","price":0.0}]
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.variant_groups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Varian dapat dibaca siapa saja" ON public.variant_groups FOR SELECT USING (true);
+CREATE POLICY "Varian dapat dikelola siapa saja" ON public.variant_groups FOR ALL USING (true);
+
+CREATE TABLE public.menu_item_variants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    menu_item_id UUID NOT NULL REFERENCES public.menu_items(id) ON DELETE CASCADE,
+    group_id UUID NOT NULL REFERENCES public.variant_groups(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE (menu_item_id, group_id)
+);
+
+CREATE INDEX idx_menu_item_variants_menu ON public.menu_item_variants(menu_item_id);
+CREATE INDEX idx_menu_item_variants_group ON public.menu_item_variants(group_id);
+
+ALTER TABLE public.menu_item_variants ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Penerapan varian dapat dibaca siapa saja" ON public.menu_item_variants FOR SELECT USING (true);
+CREATE POLICY "Penerapan varian dapat dikelola siapa saja" ON public.menu_item_variants FOR ALL USING (true);
 
 -- 3. Tabel Banner Promosi (Horizontal Carousel)
 CREATE TABLE public.banners (

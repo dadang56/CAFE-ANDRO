@@ -50,13 +50,15 @@ object PrinterManager {
     const val LINE_WIDTH = 32
 
     /**
-     * Lebar untuk STRUK (printReceipt) yang memakai Font B (font kecil/rapat):
-     * ~42 karakter per baris pada 58mm (384 dot / 9 dot per char), vs 32 di
-     * Font A. Font B dipilih agar baris panjang (mis. "Kasir : Admin Demo
-     * (Dapoer Lavana)", "Metode: QRIS (Menunggu Verifikasi)") muat dalam satu
-     * baris -- tidak turun/terpotong ke baris kedua.
+     * Lebar untuk STRUK (printReceipt) yang memakai Font B (font kecil/rapat).
+     * Font B = 9 dot per karakter, jadi 384 dot / 9 = 42 kolom secara teori --
+     * tapi 42 kolom (378 dot) menyisakan margin 6 dot saja sehingga karakter
+     * terakhir & garis pemisah menempel/terpotong di tepi kanan kertas.
+     * Dipakai 40 kolom (360 dot, margin 24 dot) yang masih cukup untuk baris
+     * panjang seperti "Kasir : Admin Demo (Dapoer Lavana)" (34 karakter) dan
+     * "Metode: QRIS (Menunggu Verifikasi)" (34 karakter) dalam satu baris.
      */
-    const val RECEIPT_WIDTH = 42
+    const val RECEIPT_WIDTH = 40
 
     /** UUID standar untuk Serial Port Profile (SPP). */
     private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
@@ -80,6 +82,34 @@ object PrinterManager {
 
     /** Lebar printer dalam dot untuk kertas 58mm @ 203dpi (umum di printer thermal murah). */
     private const val PRINTER_DOTS_WIDTH = 384
+
+    /**
+     * Lebar logo dalam dot. Sengaja lebih kecil dari [PRINTER_DOTS_WIDTH] agar
+     * ada margin kiri/kanan dan raster-nya tidak mepet tepi kertas.
+     */
+    private const val LOGO_DOTS_WIDTH = 336
+
+    /**
+     * Ambang gelap untuk konversi logo ke 1-bit. Logo Dapoer Lavana berwarna
+     * hijau sage (luminance ~160), jadi ambang 128 membuat seluruh logo dianggap
+     * putih dan tercetak kosong. Ambang 200 membuat warna logo tercetak hitam
+     * sementara latar putih (255) tetap tidak tercetak.
+     */
+    private const val LOGO_LUMINANCE_THRESHOLD = 200.0
+
+    /**
+     * Tinggi satu band raster logo. Perintah GS v 0 dengan tinggi besar sering
+     * membanjiri buffer printer murah; dipecah per band agar printer bisa
+     * mencetak sambil menerima.
+     */
+    private const val RASTER_BAND_HEIGHT = 24
+
+    /**
+     * Printer thermal murah punya buffer terima kecil (1-4 KB). Data dikirim
+     * per potongan kecil dengan jeda agar tidak ada byte yang dibuang.
+     */
+    private const val CHUNK_SIZE = 128
+    private const val CHUNK_DELAY_MS = 20L
 
     /**
      * Daftar printer Bluetooth yang sudah ter-pairing (bonded).
@@ -153,12 +183,13 @@ object PrinterManager {
             socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
             socket.connect()
 
-            val out = socket.outputStream
-            out.write(CMD_INIT)
-            out.write(encode(content))
-            out.write(CMD_FEED)
-            out.write(CMD_CUT)
-            out.flush()
+            val job = ByteArrayOutputStream()
+            job.write(CMD_INIT)
+            job.write(encode(content))
+            job.write(CMD_FEED)
+            job.write(CMD_CUT)
+
+            sendJob(socket, job.toByteArray())
 
             Result.success(Unit)
         } catch (e: SecurityException) {
@@ -198,52 +229,58 @@ object PrinterManager {
             socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
             socket.connect()
 
-            val out = socket.outputStream
-            out.write(CMD_INIT)
-            // Seluruh struk memakai Font B (rapat, ~42 kolom) agar baris panjang muat
+            // Rakit seluruh struk lebih dulu, baru kirim per potongan kecil. Menulis
+            // langsung ke outputStream lalu menutup socket membuat byte terakhir
+            // hilang -- itulah penyebab bagian bawah struk (logo & ucapan) terpotong.
+            val job = ByteArrayOutputStream()
+            job.write(CMD_INIT)
+            // Seluruh struk memakai Font B (rapat, 40 kolom) agar baris panjang muat
             // satu baris. Logo (raster) tidak terpengaruh perintah font ini.
-            out.write(CMD_FONT_B)
+            job.write(CMD_FONT_B)
 
             for (el in elements) {
                 when (el) {
                     is ReceiptElement.Logo -> {
-                        out.write(bitmapToEscPosRaster(el.bitmap))
+                        job.write(CMD_ALIGN_CENTER)
+                        job.write(bitmapToEscPosRaster(el.bitmap))
+                        job.write(CMD_ALIGN_LEFT)
                     }
                     is ReceiptElement.TextLine -> {
-                        out.write(
+                        job.write(
                             when (el.align) {
                                 ReceiptAlign.LEFT -> CMD_ALIGN_LEFT
                                 ReceiptAlign.CENTER -> CMD_ALIGN_CENTER
                                 ReceiptAlign.RIGHT -> CMD_ALIGN_RIGHT
                             }
                         )
-                        if (el.bold) out.write(CMD_BOLD_ON)
-                        if (el.doubleHeight) out.write(CMD_DOUBLE_HEIGHT_ON)
+                        if (el.bold) job.write(CMD_BOLD_ON)
+                        if (el.doubleHeight) job.write(CMD_DOUBLE_HEIGHT_ON)
                         // Bungkus teks yang melebihi lebar kertas pada batas kata agar
                         // tidak terpotong di tengah kata oleh hardware printer
                         // (mis. "Kasir : Admin Demo (Dapoer Lavan" + "a)").
                         for (line in wrapText(el.text, RECEIPT_WIDTH)) {
-                            out.write(encode(line))
-                            out.write(byteArrayOf(0x0A))
+                            job.write(encode(line))
+                            job.write(byteArrayOf(0x0A))
                         }
-                        if (el.doubleHeight) out.write(CMD_DOUBLE_HEIGHT_OFF)
-                        if (el.bold) out.write(CMD_BOLD_OFF)
+                        if (el.doubleHeight) job.write(CMD_DOUBLE_HEIGHT_OFF)
+                        if (el.bold) job.write(CMD_BOLD_OFF)
                     }
                     ReceiptElement.Divider -> {
-                        out.write(CMD_ALIGN_LEFT)
-                        out.write(encode("-".repeat(RECEIPT_WIDTH)))
-                        out.write(byteArrayOf(0x0A))
+                        job.write(CMD_ALIGN_LEFT)
+                        job.write(encode("-".repeat(RECEIPT_WIDTH)))
+                        job.write(byteArrayOf(0x0A))
                     }
                     ReceiptElement.Spacer -> {
-                        out.write(byteArrayOf(0x0A))
+                        job.write(byteArrayOf(0x0A))
                     }
                 }
             }
 
-            out.write(CMD_ALIGN_LEFT)
-            out.write(CMD_FEED)
-            out.write(CMD_CUT)
-            out.flush()
+            job.write(CMD_ALIGN_LEFT)
+            job.write(CMD_FEED)
+            job.write(CMD_CUT)
+
+            sendJob(socket, job.toByteArray())
 
             Result.success(Unit)
         } catch (e: SecurityException) {
@@ -260,42 +297,88 @@ object PrinterManager {
     }
 
     /**
+     * Kirim satu job cetak ke printer lalu tunggu sebentar sebelum socket ditutup.
+     *
+     * Dua hal penting di sini:
+     * 1. Data dipecah per [CHUNK_SIZE] byte dengan jeda [CHUNK_DELAY_MS], karena
+     *    buffer terima printer thermal murah kecil (1-4 KB). Sekali kirim besar
+     *    (mis. raster logo ~6 KB) membuat sisa data dibuang printer.
+     * 2. Setelah byte terakhir dikirim, [drainDelayMs] menahan socket tetap
+     *    terbuka. `flush()` pada BluetoothSocket TIDAK menunggu data benar-benar
+     *    diterima printer; menutup socket langsung setelah flush memutus RFCOMM
+     *    saat byte terakhir masih di perjalanan sehingga ekor struk hilang.
+     */
+    private fun sendJob(socket: BluetoothSocket, data: ByteArray) {
+        val out = socket.outputStream
+        var offset = 0
+        while (offset < data.size) {
+            val len = minOf(CHUNK_SIZE, data.size - offset)
+            out.write(data, offset, len)
+            out.flush()
+            offset += len
+            sleepQuietly(CHUNK_DELAY_MS)
+        }
+        sleepQuietly(drainDelayMs(data.size))
+    }
+
+    /** Jeda tunggu sebelum menutup socket, proporsional dengan besar job. */
+    private fun drainDelayMs(totalBytes: Int): Long =
+        (600L + totalBytes / 4L).coerceAtMost(4000L)
+
+    private fun sleepQuietly(ms: Long) {
+        try {
+            Thread.sleep(ms)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+    }
+
+    /**
      * Konversi bitmap ke perintah raster image ESC/POS (GS v 0), monokrom 1-bit.
-     * Bitmap diskalakan agar lebarnya pas dengan [PRINTER_DOTS_WIDTH] (384 dot / 58mm).
+     * Bitmap diskalakan ke [LOGO_DOTS_WIDTH] dan dipecah menjadi beberapa band
+     * setinggi [RASTER_BAND_HEIGHT] agar tiap perintah tetap kecil.
      */
     private fun bitmapToEscPosRaster(original: Bitmap): ByteArray {
-        val targetWidth = PRINTER_DOTS_WIDTH
+        val targetWidth = LOGO_DOTS_WIDTH
         val scale = targetWidth.toFloat() / original.width
         val targetHeight = (original.height * scale).toInt().coerceAtLeast(1)
         val bitmap = Bitmap.createScaledBitmap(original, targetWidth, targetHeight, true)
 
         val bytesPerRow = (targetWidth + 7) / 8
-        val imageBytes = ByteArray(bytesPerRow * targetHeight)
+        val output = ByteArrayOutputStream()
 
-        for (y in 0 until targetHeight) {
-            for (x in 0 until targetWidth) {
-                val pixel = bitmap.getPixel(x, y)
-                val alpha = Color.alpha(pixel)
-                // Anggap transparan sebagai putih (tidak dicetak); selain itu ambang gray-scale.
-                val luminance = (Color.red(pixel) * 0.299 + Color.green(pixel) * 0.587 + Color.blue(pixel) * 0.114)
-                val isBlack = alpha > 32 && luminance < 128
-                if (isBlack) {
-                    val byteIndex = y * bytesPerRow + (x / 8)
-                    val bitIndex = 7 - (x % 8)
-                    imageBytes[byteIndex] = (imageBytes[byteIndex].toInt() or (1 shl bitIndex)).toByte()
+        var bandTop = 0
+        while (bandTop < targetHeight) {
+            val bandHeight = minOf(RASTER_BAND_HEIGHT, targetHeight - bandTop)
+            val bandBytes = ByteArray(bytesPerRow * bandHeight)
+
+            for (row in 0 until bandHeight) {
+                val y = bandTop + row
+                for (x in 0 until targetWidth) {
+                    val pixel = bitmap.getPixel(x, y)
+                    val alpha = Color.alpha(pixel)
+                    // Anggap transparan sebagai putih (tidak dicetak); selain itu ambang gray-scale.
+                    val luminance = (Color.red(pixel) * 0.299 + Color.green(pixel) * 0.587 + Color.blue(pixel) * 0.114)
+                    val isBlack = alpha > 32 && luminance < LOGO_LUMINANCE_THRESHOLD
+                    if (isBlack) {
+                        val byteIndex = row * bytesPerRow + (x / 8)
+                        val bitIndex = 7 - (x % 8)
+                        bandBytes[byteIndex] = (bandBytes[byteIndex].toInt() or (1 shl bitIndex)).toByte()
+                    }
                 }
             }
+
+            val xL = (bytesPerRow and 0xFF).toByte()
+            val xH = ((bytesPerRow shr 8) and 0xFF).toByte()
+            val yL = (bandHeight and 0xFF).toByte()
+            val yH = ((bandHeight shr 8) and 0xFF).toByte()
+
+            output.write(byteArrayOf(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH)) // GS v 0
+            output.write(bandBytes)
+
+            bandTop += bandHeight
         }
 
-        val xL = (bytesPerRow and 0xFF).toByte()
-        val xH = ((bytesPerRow shr 8) and 0xFF).toByte()
-        val yL = (targetHeight and 0xFF).toByte()
-        val yH = ((targetHeight shr 8) and 0xFF).toByte()
-
-        val header = byteArrayOf(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH) // GS v 0
-        val output = ByteArrayOutputStream()
-        output.write(header)
-        output.write(imageBytes)
         output.write(byteArrayOf(0x0A))
         return output.toByteArray()
     }

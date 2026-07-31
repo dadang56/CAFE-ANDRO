@@ -566,6 +566,7 @@ fun TabBeranda(
         // Hot Promo Banner Section — hanya tampil jika ada banner promo dari admin
         val activeBanners = bannerList
         var selectedMenuForPreview by remember { mutableStateOf<MenuItem?>(null) }
+        var selectedMenuForVariant by remember { mutableStateOf<MenuItem?>(null) }
         var showAllPromosDialog by remember { mutableStateOf(false) }
 
         fun openBanner(banner: BannerItem) {
@@ -767,8 +768,14 @@ fun TabBeranda(
                 confirmButton = {
                     Button(
                         onClick = {
-                            CartManager.addItem(menu)
-                            selectedMenuForPreview = null
+                            if (VariantLibrary.hasVariants(menu)) {
+                                // Produk bervarian → buka pemilih varian dulu.
+                                selectedMenuForPreview = null
+                                selectedMenuForVariant = menu
+                            } else {
+                                CartManager.addItem(menu)
+                                selectedMenuForPreview = null
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
                     ) {
@@ -779,6 +786,20 @@ fun TabBeranda(
                     TextButton(onClick = { selectedMenuForPreview = null }) {
                         Text("Tutup", color = Color.Gray)
                     }
+                }
+            )
+        }
+
+        // Pemilih varian (Level Pedas, Topping, dll) untuk produk yang memilikinya.
+        if (selectedMenuForVariant != null) {
+            val menu = selectedMenuForVariant!!
+            VariantPickerDialog(
+                menuItem = menu,
+                onDismiss = { selectedMenuForVariant = null },
+                onConfirm = { selected, qty ->
+                    CartManager.addConfiguredItem(menu, qty, selected)
+                    selectedMenuForVariant = null
+                    android.widget.Toast.makeText(context, "${menu.name} ditambahkan ke keranjang", android.widget.Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -884,8 +905,12 @@ fun TabBeranda(
                                         }
                                     },
                                     onAddToCart = {
-                                        CartManager.addItem(item)
-                                        android.widget.Toast.makeText(context, "${item.name} berhasil ditambahkan ke keranjang", android.widget.Toast.LENGTH_SHORT).show()
+                                        if (VariantLibrary.hasVariants(item)) {
+                                            selectedMenuForVariant = item
+                                        } else {
+                                            CartManager.addItem(item)
+                                            android.widget.Toast.makeText(context, "${item.name} berhasil ditambahkan ke keranjang", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 )
                             }
@@ -914,6 +939,9 @@ fun JcoProductCard(
     val context = LocalContext.current
     val quantity = CartManager.getItemQuantity(item)
     val originalPrice = item.getOriginalPrice()
+    // Produk bervarian selalu membuka pemilih varian (tiap tap bisa varian berbeda),
+    // jadi tidak menampilkan stepper +/- langsung di kartu.
+    val hasVariants = VariantLibrary.hasVariants(item)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1015,7 +1043,8 @@ fun JcoProductCard(
                         ) {
                             Text("Habis", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
-                    } else if (quantity == 0) {
+                    } else if (quantity == 0 || hasVariants) {
+                        // Produk bervarian: selalu tombol "Beli" (buka pemilih varian).
                         Button(
                             onClick = onAddToCart,
                             modifier = Modifier
@@ -1025,7 +1054,12 @@ fun JcoProductCard(
                             colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text("Beli", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OnAccentDark)
+                            Text(
+                                if (hasVariants && quantity > 0) "Beli ($quantity)" else "Beli",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OnAccentDark
+                            )
                         }
                     } else {
                         Row(
@@ -1103,6 +1137,175 @@ fun JcoProductCard(
             }
         }
     }
+}
+
+// ==========================================================
+// Dialog Pemilih Varian (customer): Level Pedas, Topping, dll.
+// ==========================================================
+@Composable
+fun VariantPickerDialog(
+    menuItem: MenuItem,
+    onDismiss: () -> Unit,
+    onConfirm: (List<SelectedVariant>, Int) -> Unit
+) {
+    val groups = VariantLibrary.groupsFor(menuItem)
+    // selections[indexGrup] = set index pilihan yang dipilih pada grup itu.
+    val selections = remember(menuItem.id) { mutableStateMapOf<Int, Set<Int>>() }
+    var quantity by remember(menuItem.id) { mutableStateOf(1) }
+
+    fun toggle(gi: Int, oi: Int, multiple: Boolean) {
+        val cur = selections[gi] ?: emptySet()
+        selections[gi] = if (multiple) {
+            if (cur.contains(oi)) cur - oi else cur + oi
+        } else {
+            if (cur.contains(oi)) emptySet() else setOf(oi)
+        }
+    }
+
+    val selected: List<SelectedVariant> = groups.flatMapIndexed { gi, g ->
+        (selections[gi] ?: emptySet()).sorted().mapNotNull { oi ->
+            g.options.getOrNull(oi)?.let { SelectedVariant(g.name, it.name, it.price) }
+        }
+    }
+    val allRequiredSatisfied = groups.withIndex().all { (gi, g) ->
+        !g.required || (selections[gi]?.isNotEmpty() == true)
+    }
+    val grandTotal = (menuItem.price + selected.sumOf { it.price }) * quantity
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color.White,
+        title = { Text(menuItem.name, fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = "Rp ${String.format("%,.0f", menuItem.price)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = OrangeJco
+                )
+
+                groups.forEachIndexed { gi, g ->
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(g.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (g.required) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(PromoRed.copy(alpha = 0.12f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text("Wajib", color = PromoRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    Text(
+                        text = if (g.multiple) "Boleh pilih lebih dari 1" else "Pilih salah satu",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    g.options.forEachIndexed { oi, opt ->
+                        val checked = selections[gi]?.contains(oi) == true
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { toggle(gi, oi, g.multiple) }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Handler klik ada di Row (onClick kontrol = null) agar tidak
+                            // ter-toggle dua kali saat menekan tepat di checkbox/radio.
+                            if (g.multiple) {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(checkedColor = OrangeJco)
+                                )
+                            } else {
+                                RadioButton(
+                                    selected = checked,
+                                    onClick = null,
+                                    colors = RadioButtonDefaults.colors(selectedColor = OrangeJco)
+                                )
+                            }
+                            Text(
+                                text = opt.name,
+                                fontSize = 13.sp,
+                                color = DarkCharcoal,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (opt.price > 0) {
+                                Text(
+                                    text = "+Rp ${String.format("%,.0f", opt.price)}",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Jumlah", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkCharcoal)
+                    Row(
+                        modifier = Modifier
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(LightOrangeJco)
+                            .border(1.dp, OrangeJco, RoundedCornerShape(10.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { if (quantity > 1) quantity-- }, modifier = Modifier.size(34.dp)) {
+                            Text("-", fontWeight = FontWeight.Bold, color = OrangeJco, fontSize = 16.sp)
+                        }
+                        Text(
+                            text = quantity.toString(),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = OrangeJco,
+                            modifier = Modifier.padding(horizontal = 10.dp)
+                        )
+                        IconButton(onClick = { quantity++ }, modifier = Modifier.size(34.dp)) {
+                            Text("+", fontWeight = FontWeight.Bold, color = OrangeJco, fontSize = 16.sp)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(selected, quantity) },
+                enabled = allRequiredSatisfied,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = OrangeAccent,
+                    disabledContainerColor = Color.LightGray
+                ),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text(
+                    text = "Tambah • Rp ${String.format("%,.0f", grandTotal)}",
+                    color = OnAccentDark,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Batal", color = Color.Gray)
+            }
+        }
+    )
 }
 
 // ==========================================================
@@ -1429,9 +1632,26 @@ fun TabWishlist(
 ) {
     val context = LocalContext.current
     val isGuest = remember { SupabaseClient.currentUserId == null }
+    var selectedMenuForVariant by remember { mutableStateOf<MenuItem?>(null) }
 
     val wishlistItems = remember(displayMenu, favoriteItemIds) {
         displayMenu.filter { favoriteItemIds.contains(it.id) }
+    }
+
+    if (selectedMenuForVariant != null) {
+        val menu = selectedMenuForVariant!!
+        VariantPickerDialog(
+            menuItem = menu,
+            onDismiss = { selectedMenuForVariant = null },
+            onConfirm = { selected, qty ->
+                if (CartManager.selectedOrderType == null) {
+                    CartManager.selectedOrderType = "Dine In"
+                }
+                CartManager.addConfiguredItem(menu, qty, selected)
+                selectedMenuForVariant = null
+                android.widget.Toast.makeText(context, "${menu.name} ditambahkan ke keranjang", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize().background(LightGrayJco)) {
@@ -1560,11 +1780,15 @@ fun TabWishlist(
                                 // Beli button
                                 Button(
                                     onClick = {
-                                        if (CartManager.selectedOrderType == null) {
-                                            CartManager.selectedOrderType = "Dine In" // Default for quick buy
+                                        if (VariantLibrary.hasVariants(item)) {
+                                            selectedMenuForVariant = item
+                                        } else {
+                                            if (CartManager.selectedOrderType == null) {
+                                                CartManager.selectedOrderType = "Dine In" // Default for quick buy
+                                            }
+                                            CartManager.addItem(item)
+                                            android.widget.Toast.makeText(context, "${item.name} berhasil ditambahkan ke keranjang", android.widget.Toast.LENGTH_SHORT).show()
                                         }
-                                        CartManager.addItem(item)
-                                        android.widget.Toast.makeText(context, "${item.name} berhasil ditambahkan ke keranjang", android.widget.Toast.LENGTH_SHORT).show()
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                                     shape = RoundedCornerShape(12.dp),

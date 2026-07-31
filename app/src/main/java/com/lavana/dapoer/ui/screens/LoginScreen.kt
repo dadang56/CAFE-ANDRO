@@ -317,13 +317,33 @@ fun LoginScreen(
                                 try {
                                     // 1. Check if user is staff (Admin or Driver)
                                     try {
-                                        val staffAccounts = SupabaseClient.db["staff_accounts"].select {
+                                        var staffAccounts = SupabaseClient.db["staff_accounts"].select {
                                             filter {
                                                 eq("username", inputClean)
                                                 eq("password", password)
                                             }
                                         }.decodeList<StaffAccount>()
-                                        
+
+                                        // Fallback: coba juga username APA ADANYA (tanpa suffix).
+                                        // Form admin "Daftarkan Akun Driver / Admin Baru" menyimpan
+                                        // username persis seperti diketik -- termasuk nomor HP polos
+                                        // (mis. "081234567890") tanpa "@lavana.com". Tapi input login
+                                        // di atas SELALU menambah suffix itu bila belum ada "@", jadi akun
+                                        // staff yang usernamenya bukan email akan selalu tidak cocok pada
+                                        // query pertama. Tanpa fallback ini, akun seperti itu -- termasuk
+                                        // akun Admin yang sudah ada di database -- tidak akan pernah bisa
+                                        // login walau username & password yang diketik sudah benar.
+                                        if (staffAccounts.isEmpty() && rawInput != inputClean) {
+                                            staffAccounts = try {
+                                                SupabaseClient.db["staff_accounts"].select {
+                                                    filter {
+                                                        eq("username", rawInput)
+                                                        eq("password", password)
+                                                    }
+                                                }.decodeList<StaffAccount>()
+                                            } catch (e: Exception) { emptyList() }
+                                        }
+
                                         if (staffAccounts.isNotEmpty()) {
                                             val staff = staffAccounts.first()
                                             CartManager.currentStaff = staff

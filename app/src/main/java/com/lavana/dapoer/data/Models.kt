@@ -197,6 +197,7 @@ data class ChatMessage(
     @SerialName("created_at") val createdAt: String? = null
 )
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class OrderItem(
     val id: String? = null,
@@ -204,6 +205,14 @@ data class OrderItem(
     @SerialName("menu_item_id") val menuItemId: String,
     val quantity: Int,
     @SerialName("price_at_order") val priceAtOrder: Double,
+    // @EncodeDefault ALWAYS: encodeDefaults=false (SupabaseClient.kt) membuang key
+    // "notes" sepenuhnya dari JSON kalau nilainya null (default). Saat sebuah List<OrderItem>
+    // dikirim sekaligus (bulk insert Simpan & Cetak), item dengan notes=null jadi TIDAK
+    // punya key "notes" sementara item ber-varian PUNYA key itu -- PostgREST menolak
+    // seluruh batch dengan "All object keys must match" karena bentuk objeknya beda-beda.
+    // ALWAYS memaksa key ini selalu ikut (isi teks atau null), jadi seluruh item di satu
+    // batch selalu punya key yang sama persis.
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
     val notes: String? = null
 )
 

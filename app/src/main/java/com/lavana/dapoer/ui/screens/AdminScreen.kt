@@ -1087,7 +1087,9 @@ fun KasirOrderDialog(
 
     fun addConfigured(item: MenuItem, qty: Int, selected: List<SelectedVariant>) {
         if (qty <= 0) return
-        val notes = selected.joinToString(", ") { "${it.group}: ${it.option}" }.ifBlank { null }
+        // Nama grup TIDAK disertakan -- lihat CartManager.variantNotes() untuk alasannya
+        // (samakan formatnya dengan jalur checkout pelanggan).
+        val notes = selected.joinToString(", ") { it.option }.ifBlank { null }
         val unit = item.price + selected.sumOf { it.price }
         val i = cart.indexOfFirst { it.menuItemId == item.id && it.variantNotes == notes && it.unitPrice == unit }
         if (i != -1) cart[i] = cart[i].copy(quantity = cart[i].quantity + qty)

@@ -34,7 +34,10 @@ fun CartItem.lineTotal(): Double = unitPrice() * quantity
 // Label ringkas untuk tampilan, mis. "Pedas, Bawang Goreng".
 fun CartItem.variantLabel(): String = selectedVariants.joinToString(", ") { it.option }
 // Catatan lengkap untuk struk/dapur, mis. "Level Pedas: Pedas, Topping: Bawang Goreng".
-fun CartItem.variantNotes(): String = selectedVariants.joinToString(", ") { "${it.group}: ${it.option}" }
+// Nama grup TIDAK disertakan (mis. bukan "Level Pedas: Pedas") -- struk & slip
+// dapur cukup menyebut pilihannya saja, nama grup umumnya sudah jelas dari nama
+// menu itu sendiri dan hanya membuat catatan lebih panjang tanpa informasi baru.
+fun CartItem.variantNotes(): String = selectedVariants.joinToString(", ") { it.option }
 
 object CartManager {
     val items = mutableStateListOf<CartItem>()

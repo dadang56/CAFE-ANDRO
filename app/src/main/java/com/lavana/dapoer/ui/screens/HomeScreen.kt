@@ -1346,6 +1346,18 @@ fun TabOrderHistory(
         }
     }
 
+    // Peta menuItemId -> nama menu untuk "Lihat Resi" (ReceiptDialog). Tanpa ini
+    // menuItemsMap selalu kosong dan setiap item di struk digital tampil sebagai
+    // "Menu Tidak Dikenal" -- baris ini sebelumnya tidak pernah ada.
+    LaunchedEffect(Unit) {
+        try {
+            val menuList = SupabaseClient.initializeMenuIfEmpty()
+            menuList.forEach { menuItemsMap[it.id] = it.name }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     LaunchedEffect(Unit) {
         val userId = SupabaseClient.currentUserId
         if (userId != null) {

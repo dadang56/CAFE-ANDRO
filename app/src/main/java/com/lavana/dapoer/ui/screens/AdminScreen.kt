@@ -266,6 +266,9 @@ fun TabAdminOrders() {
         // Sales Summary Card
         val totalSales = ordersList.filter { it.status == "Selesai" }.sumOf { it.total }
         val completedCount = ordersList.filter { it.status == "Selesai" }.size
+        // Pesanan yang dibatalkan tidak perlu terus nongkrong di laman kerja kasir --
+        // riwayatnya tetap tersimpan dan bisa dilihat lewat tab Laporan.
+        val visibleOrders = remember(ordersList) { ordersList.filterNot { it.status == "Dibatalkan" } }
 
         // Floating teal gradient header with summary
         Box(
@@ -393,7 +396,7 @@ fun TabAdminOrders() {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (ordersList.isEmpty()) {
+                if (visibleOrders.isEmpty()) {
                     item {
                         AdminEmptyState(
                             icon = Icons.Default.ReceiptLong,
@@ -402,7 +405,7 @@ fun TabAdminOrders() {
                         )
                     }
                 } else {
-                    items(ordersList) { order ->
+                    items(visibleOrders) { order ->
                         AdminOrderCard(
                             order = order,
                             drivers = driversList,
@@ -901,6 +904,16 @@ fun TabAdminOrders() {
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                             color = Color.Black
                         )
+                        selectedOrderForPrint?.kasirCashInfo()?.let { (bayar, kembali) ->
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Bayar", fontSize = 10.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, color = Color.Black)
+                                Text("Rp ${String.format("%,.0f", bayar)}", fontSize = 10.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, color = Color.Black)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Kembali", fontSize = 10.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, color = Color.Black)
+                                Text("Rp ${String.format("%,.0f", kembali)}", fontSize = 10.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, color = Color.Black)
+                            }
+                        }
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // BAWAH: rata tengah
@@ -1057,6 +1070,10 @@ fun KasirOrderDialog(
     var saving by remember { mutableStateOf(false) }
     // Produk yang sedang dipilihkan variannya oleh kasir.
     var menuForVariantPick by remember { mutableStateOf<MenuItem?>(null) }
+    // Kalkulator kembalian untuk pembayaran Tunai. Kosong = kasir belum/tidak mengisi
+    // nominal (boleh langsung Simpan & Cetak seperti sebelumnya, fitur ini opsional).
+    var cashInput by remember { mutableStateOf("") }
+    var showBillDetail by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         allMenu = try {
@@ -1109,6 +1126,9 @@ fun KasirOrderDialog(
 
     val subtotal = cart.sumOf { it.unitPrice * it.quantity }
     val totalQty = cart.sumOf { it.quantity }
+    val cashReceived = cashInput.toDoubleOrNull()
+    val changeAmount = if (payment == "Tunai" && cashReceived != null) cashReceived - subtotal else null
+    val cashInsufficient = changeAmount != null && changeAmount < 0
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(modifier = Modifier.fillMaxSize(), color = LightGrayJco) {
@@ -1335,23 +1355,83 @@ fun KasirOrderDialog(
                     }
                 }
 
-                // Bar bawah: metode bayar + total + simpan
+                // Bar bawah: metode bayar + kalkulator kembalian + total + simpan
                 Surface(color = Color.White, shadowElevation = 12.dp) {
                     Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Bayar:", fontSize = 13.sp, color = DarkCharcoal, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.width(10.dp))
-                            listOf("Tunai", "QRIS").forEach { m ->
-                                val sel = payment == m
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Bayar:", fontSize = 13.sp, color = DarkCharcoal, fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.width(10.dp))
+                                listOf("Tunai", "QRIS").forEach { m ->
+                                    val sel = payment == m
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(end = 8.dp)
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(if (sel) OrangeJco else LightGrayJco)
+                                            .clickable { payment = m }
+                                            .padding(horizontal = 18.dp, vertical = 7.dp)
+                                    ) {
+                                        Text(m, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (sel) Color.White else DarkCharcoal)
+                                    }
+                                }
+                            }
+                            TextButton(onClick = { showBillDetail = true }, enabled = cart.isNotEmpty()) {
+                                Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = OrangeJco, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Lihat Detail", color = OrangeJco, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        // Kalkulator kembalian -- hanya untuk Tunai. Kosongkan input = boleh
+                        // langsung Simpan tanpa mengisi ini (opsional, tidak mengunci alur lama).
+                        if (payment == "Tunai") {
+                            Spacer(Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = cashInput,
+                                onValueChange = { txt -> cashInput = txt.filter { it.isDigit() } },
+                                label = { Text("Nominal Pembayaran", fontSize = 12.sp) },
+                                placeholder = { Text("Rp 0") },
+                                singleLine = true,
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = OrangeJco,
+                                    unfocusedBorderColor = Color.LightGray,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                )
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .padding(end = 8.dp)
                                         .clip(RoundedCornerShape(20.dp))
-                                        .background(if (sel) OrangeJco else LightGrayJco)
-                                        .clickable { payment = m }
-                                        .padding(horizontal = 18.dp, vertical = 7.dp)
+                                        .background(LightOrangeJco)
+                                        .clickable { cashInput = subtotal.toLong().toString() }
+                                        .padding(horizontal = 14.dp, vertical = 6.dp)
                                 ) {
-                                    Text(m, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (sel) Color.White else DarkCharcoal)
+                                    Text("Uang Pas", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OrangeJco)
+                                }
+                                Spacer(Modifier.weight(1f))
+                                if (changeAmount != null) {
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            if (cashInsufficient) "Kurang" else "Kembalian",
+                                            fontSize = 11.sp,
+                                            color = Color.Gray
+                                        )
+                                        Text(
+                                            "Rp ${String.format("%,.0f", kotlin.math.abs(changeAmount))}",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (cashInsufficient) Color.Red else ForestGreen
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1364,7 +1444,21 @@ fun KasirOrderDialog(
                             Button(
                                 onClick = {
                                     if (totalQty == 0 || saving) return@Button
+                                    if (cashInsufficient) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Uang tunai kurang Rp ${String.format("%,.0f", kotlin.math.abs(changeAmount ?: 0.0))}",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                        return@Button
+                                    }
                                     saving = true
+                                    // Info bayar/kembalian ikut disimpan ke notes pesanan (bukan kolom
+                                    // baru) supaya tercetak di struk tanpa perlu migrasi skema DB.
+                                    val cashSuffix = if (payment == "Tunai" && cashReceived != null && cashReceived > 0) {
+                                        "|BAYAR:${cashReceived}|KEMBALI:${cashReceived - subtotal}"
+                                    } else ""
+                                    val kasirNotes = "Pesanan langsung di kasir$cashSuffix"
                                     scope.launch {
                                         try {
                                             val savedOrder: Order
@@ -1379,6 +1473,7 @@ fun KasirOrderDialog(
                                                         set("total", subtotal)
                                                         set("payment_method", payment)
                                                         set("customer_name", newName)
+                                                        set("notes", kasirNotes)
                                                     }) { filter { eq("id", orderId) } }
                                                 } catch (e: Exception) {
                                                     // Pengaman bila kolom customer_name belum ada di DB.
@@ -1388,13 +1483,17 @@ fun KasirOrderDialog(
                                                             set("subtotal", subtotal)
                                                             set("total", subtotal)
                                                             set("payment_method", payment)
+                                                            set("notes", kasirNotes)
                                                         }) { filter { eq("id", orderId) } }
                                                     } else throw e
                                                 }
-                                                // Ganti seluruh baris item: hapus yang lama lalu tulis yang baru.
-                                                // Lebih sederhana & konsisten daripada diff per baris.
-                                                SupabaseClient.db["order_items"].delete { filter { eq("order_id", orderId) } }
-                                                val items = cart.map {
+                                                // Ganti seluruh baris item: TULIS DULU baris baru, baru hapus yang
+                                                // lama. Urutan ini sengaja dibalik dari (hapus lalu tulis) --
+                                                // kalau insert gagal (mis. error jaringan/validasi) sesudah hapus
+                                                // lebih dulu, pesanan berakhir TANPA item sama sekali (struknya
+                                                // jadi kosong padahal totalnya tetap ada, sulit disadari kasir).
+                                                // Insert dulu memastikan kalau gagal, item lama masih utuh.
+                                                val itemsToInsert = cart.map {
                                                     OrderItem(
                                                         orderId = orderId,
                                                         menuItemId = it.menuItemId,
@@ -1403,13 +1502,25 @@ fun KasirOrderDialog(
                                                         notes = it.variantNotes
                                                     )
                                                 }
-                                                if (items.isNotEmpty()) SupabaseClient.db["order_items"].insert(items)
+                                                val newIds = if (itemsToInsert.isNotEmpty()) {
+                                                    SupabaseClient.db["order_items"].insert(itemsToInsert) { select() }
+                                                        .decodeList<OrderItem>().mapNotNull { it.id }
+                                                } else emptyList()
+                                                SupabaseClient.db["order_items"].delete {
+                                                    filter {
+                                                        eq("order_id", orderId)
+                                                        if (newIds.isNotEmpty()) {
+                                                            filterNot("id", io.github.jan.supabase.postgrest.query.filter.FilterOperator.IN, newIds)
+                                                        }
+                                                    }
+                                                }
                                                 savedOrder = existingOrder.copy(
                                                     orderType = orderType,
                                                     subtotal = subtotal,
                                                     total = subtotal,
                                                     paymentMethod = payment,
-                                                    customerName = newName
+                                                    customerName = newName,
+                                                    notes = kasirNotes
                                                 )
                                                 android.widget.Toast.makeText(context, "Pesanan #${savedOrder.orderNumber} diperbarui!", android.widget.Toast.LENGTH_SHORT).show()
                                             } else {
@@ -1425,7 +1536,7 @@ fun KasirOrderDialog(
                                                     total = subtotal,
                                                     paymentMethod = payment,
                                                     paymentStatus = "Terbayar",
-                                                    notes = "Pesanan langsung di kasir",
+                                                    notes = kasirNotes,
                                                     customerName = customerName.trim().ifBlank { null },
                                                     cashierUsername = CartManager.currentStaff?.username
                                                 )
@@ -1496,6 +1607,63 @@ fun KasirOrderDialog(
             onConfirm = { selected, qty ->
                 addConfigured(picked, qty, selected)
                 menuForVariantPick = null
+            }
+        )
+    }
+
+    // Rincian isi keranjang -- berguna saat kasir sedang mencari menu lain (hasil
+    // pencarian menyembunyikan item yang sudah masuk keranjang dari daftar).
+    if (showBillDetail) {
+        AlertDialog(
+            onDismissRequest = { showBillDetail = false },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color.White,
+            title = { Text("Detail Tagihan", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (cart.isEmpty()) {
+                        Text("Keranjang masih kosong.", color = Color.Gray, fontSize = 13.sp)
+                    } else {
+                        cart.forEach { line ->
+                            val menuName = allMenu.find { it.id == line.menuItemId }?.name ?: "Item Menu"
+                            Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(
+                                        "$menuName x${line.quantity}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = DarkCharcoal,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        "Rp ${String.format("%,.0f", line.unitPrice * line.quantity)}",
+                                        fontSize = 13.sp,
+                                        color = DarkCharcoal
+                                    )
+                                }
+                                if (!line.variantNotes.isNullOrBlank()) {
+                                    Text(line.variantNotes, fontSize = 11.sp, color = Color.Gray)
+                                }
+                            }
+                            Divider(color = LightGrayJco)
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Total", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkCharcoal)
+                        Text("Rp ${String.format("%,.0f", subtotal)}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = ForestGreen)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showBillDetail = false }) {
+                    Text("Tutup", color = OrangeJco, fontWeight = FontWeight.Bold)
+                }
             }
         )
     }
@@ -2347,7 +2515,29 @@ fun TabAdminMenu() {
                                 loadMenu(showLoadingSpinner = false)
                             } catch (e: Exception) {
                                 e.printStackTrace()
-                                android.widget.Toast.makeText(context, "Gagal menghapus menu: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                // Menu yang sudah pernah dipesan tidak bisa dihapus (FK order_items ->
+                                // menu_items menahannya) -- daripada tampilkan error Postgres mentah,
+                                // nonaktifkan saja supaya tetap hilang dari katalog tanpa merusak
+                                // riwayat pesanan lama yang masih mengacu ke menu ini.
+                                val isForeignKeyBlock = e.message?.contains("foreign key", ignoreCase = true) == true ||
+                                    e.message?.contains("violates", ignoreCase = true) == true
+                                if (isForeignKeyBlock) {
+                                    try {
+                                        SupabaseClient.db["menu_items"].update({
+                                            set("is_available", false)
+                                        }) { filter { eq("id", itemToDelete.id) } }
+                                        loadMenu(showLoadingSpinner = false)
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Menu ini sudah pernah dipesan sehingga tidak bisa dihapus permanen. Menu otomatis dinonaktifkan agar tidak tampil di katalog.",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    } catch (e2: Exception) {
+                                        android.widget.Toast.makeText(context, "Gagal menghapus menu: ${e2.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                } else {
+                                    android.widget.Toast.makeText(context, "Gagal menghapus menu: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     },
@@ -5596,6 +5786,19 @@ private fun receiptLineLR(left: String, right: String): String {
 }
 
 /**
+ * Nominal bayar & kembalian dari kalkulator tunai kasir, dititipkan di dalam
+ * order.notes ("...|BAYAR:50000|KEMBALI:37000") supaya tidak perlu kolom/migrasi
+ * DB baru. Null bila pesanan ini tidak diisi lewat kalkulator (mis. QRIS, atau
+ * pesanan dari aplikasi pelanggan).
+ */
+private fun Order.kasirCashInfo(): Pair<Double, Double>? {
+    val n = notes ?: return null
+    val bayar = Regex("BAYAR:(-?[0-9.]+)").find(n)?.groupValues?.get(1)?.toDoubleOrNull() ?: return null
+    val kembali = Regex("KEMBALI:(-?[0-9.]+)").find(n)?.groupValues?.get(1)?.toDoubleOrNull() ?: return null
+    return bayar to kembali
+}
+
+/**
  * Struk RESI (untuk pelanggan): identitas kafe + pemesan rata kiri di atas,
  * rincian pesanan & total di tengah, lalu disclaimer + logo + ucapan terima
  * kasih rata tengah di bawah. Dicetak via PrinterManager.printReceipt().
@@ -5641,6 +5844,10 @@ fun buildOrderReceiptElements(
     elements.add(ReceiptElement.TextLine(receiptLineLR("TOTAL", "Rp ${String.format("%,.0f", order.total)}"), bold = true))
     elements.add(ReceiptElement.Divider)
     elements.add(ReceiptElement.TextLine("Metode: ${order.paymentMethod} (${order.paymentStatus})"))
+    order.kasirCashInfo()?.let { (bayar, kembali) ->
+        elements.add(ReceiptElement.TextLine(receiptLineLR("Bayar", "Rp ${String.format("%,.0f", bayar)}")))
+        elements.add(ReceiptElement.TextLine(receiptLineLR("Kembali", "Rp ${String.format("%,.0f", kembali)}")))
+    }
     elements.add(ReceiptElement.Spacer)
 
     // BAWAH: rata tengah

@@ -218,6 +218,32 @@ fun TabAdminOrders() {
     var printMenuItemsMap by remember { mutableStateOf<Map<String, MenuItem>>(emptyMap()) }
     var isFetchingPrintItems by remember { mutableStateOf(false) }
 
+    // Detail pesanan: dibuka dari tombol "Detail" pada tiap kartu di Kelola Pesanan.
+    var detailOrder by remember { mutableStateOf<Order?>(null) }
+    var detailOrderItems by remember { mutableStateOf<List<OrderItem>>(emptyList()) }
+    var detailMenuItemsMap by remember { mutableStateOf<Map<String, MenuItem>>(emptyMap()) }
+    var isFetchingDetailItems by remember { mutableStateOf(false) }
+
+    fun fetchDetailItems(order: Order) {
+        detailOrder = order
+        isFetchingDetailItems = true
+        coroutineScope.launch {
+            try {
+                val items = SupabaseClient.db["order_items"].select {
+                    filter { eq("order_id", order.id ?: "") }
+                }.decodeList<OrderItem>()
+
+                val menus = SupabaseClient.db["menu_items"].select().decodeList<MenuItem>()
+                detailMenuItemsMap = menus.associateBy { it.id }
+                detailOrderItems = items
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isFetchingDetailItems = false
+            }
+        }
+    }
+
     fun fetchPrintItems(order: Order) {
         selectedOrderForPrint = order
         isFetchingPrintItems = true
@@ -433,6 +459,9 @@ fun TabAdminOrders() {
                             onOpenChat = {
                                 chatOrder = order
                             },
+                            onOpenDetail = {
+                                fetchDetailItems(order)
+                            },
                             onRejectPayment = { reason ->
                                 coroutineScope.launch {
                                     try {
@@ -605,6 +634,89 @@ fun TabAdminOrders() {
             currentSenderRole = "Admin",
             currentSenderName = "Admin Dapoer Lavana",
             onDismiss = { chatOrder = null }
+        )
+    }
+
+    if (detailOrder != null) {
+        val order = detailOrder!!
+        AlertDialog(
+            onDismissRequest = { detailOrder = null },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White,
+            title = { Text("Detail Pesanan #${order.orderNumber}", fontWeight = FontWeight.Bold, color = DarkCharcoal) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    DetailRow("Status", order.status)
+                    DetailRow("Tipe", order.orderType)
+                    if (!order.customerName.isNullOrBlank()) DetailRow("Nama Pelanggan", order.customerName)
+                    if (!order.customerPhone.isNullOrBlank()) DetailRow("Telepon", order.customerPhone)
+                    if (order.orderType == "Delivery" && !order.deliveryAddress.isNullOrBlank()) DetailRow("Alamat", order.deliveryAddress)
+                    if (!order.tableNumber.isNullOrBlank()) DetailRow("No. Meja", order.tableNumber)
+                    DetailRow("Pembayaran", "${order.paymentMethod} (${order.paymentStatus})")
+                    if (!order.notes.isNullOrBlank()) DetailRow("Catatan", order.notes)
+                    if (!order.createdAt.isNullOrBlank()) DetailRow("Waktu Pesan", order.createdAt.take(16).replace("T", " "))
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        "--------------------------------",
+                        fontSize = 11.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        color = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (isFetchingDetailItems) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = OrangeJco, modifier = Modifier.size(24.dp))
+                        }
+                    } else {
+                        detailOrderItems.forEach { item ->
+                            val menuName = detailMenuItemsMap[item.menuItemId]?.name ?: "Item Menu"
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(
+                                    "$menuName x${item.quantity}",
+                                    fontSize = 13.sp,
+                                    color = DarkCharcoal,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    "Rp ${String.format("%,.0f", item.priceAtOrder * item.quantity)}",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DarkCharcoal
+                                )
+                            }
+                            if (!item.notes.isNullOrBlank()) {
+                                Text(item.notes, fontSize = 11.sp, color = Color.Gray)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (order.discountAmount > 0) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Diskon", fontSize = 12.sp, color = Color.Gray)
+                            Text("- Rp ${String.format("%,.0f", order.discountAmount)}", fontSize = 12.sp, color = RedPromo)
+                        }
+                    }
+                    if (order.deliveryFee > 0) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Ongkir", fontSize = 12.sp, color = Color.Gray)
+                            Text("Rp ${String.format("%,.0f", order.deliveryFee)}", fontSize = 12.sp, color = DarkCharcoal)
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Total", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkCharcoal)
+                        Text("Rp ${String.format("%,.0f", order.total)}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = ForestGreen)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { detailOrder = null }) {
+                    Text("Tutup", color = OrangeJco, fontWeight = FontWeight.Bold)
+                }
+            }
         )
     }
 
@@ -1683,6 +1795,17 @@ private fun Order.isKasirOrder(): Boolean =
             notes?.contains("Pesanan langsung di kasir", ignoreCase = true) == true)
 
 @Composable
+fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.weight(0.4f))
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = DarkCharcoal, modifier = Modifier.weight(0.6f), textAlign = TextAlign.End)
+    }
+}
+
+@Composable
 fun AdminOrderCard(
     order: Order,
     drivers: List<StaffAccount>,
@@ -1691,6 +1814,7 @@ fun AdminOrderCard(
     onShowReceipt: (String) -> Unit,
     onPrintReceipt: () -> Unit,
     onOpenChat: () -> Unit,
+    onOpenDetail: () -> Unit = {},
     onRejectPayment: (String) -> Unit,
     onLocalPayment: () -> Unit,
     onMarkReady: () -> Unit,
@@ -1855,6 +1979,19 @@ fun AdminOrderCard(
                     Icon(Icons.Default.Chat, contentDescription = "Chat", tint = OrangeJco, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Chat", color = OrangeJco, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = onOpenDetail,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF2563EB)),
+                    border = BorderStroke(1.dp, Color(0xFF2563EB)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(36.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = "Detail", tint = Color(0xFF2563EB), modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Detail", color = Color(0xFF2563EB), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
                 if (!order.paymentReceiptUrl.isNullOrBlank()) {

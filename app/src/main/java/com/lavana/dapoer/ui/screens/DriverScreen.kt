@@ -366,7 +366,8 @@ fun TabDriverActive() {
                         OutlinedButton(
                             onClick = {
                                 val rawPhone = order.customerPhone ?: ""
-                                val cleanPhone = if (rawPhone.startsWith("0")) "62" + rawPhone.substring(1) else rawPhone
+                                val digitsOnly = rawPhone.filter { it.isDigit() }
+                                val cleanPhone = if (digitsOnly.startsWith("0")) "62" + digitsOnly.substring(1) else digitsOnly
                                 val uri = Uri.parse("https://wa.me/$cleanPhone")
                                 val waIntent = Intent(Intent.ACTION_VIEW, uri)
                                 try {

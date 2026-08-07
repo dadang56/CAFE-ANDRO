@@ -71,6 +71,7 @@ fun TrackingScreen(
     var isLoading by remember { mutableStateOf(true) }
     var showReceiptDialog by remember { mutableStateOf(false) }
     var showChatDialog by remember { mutableStateOf(false) }
+    var hasUnreadChatMessage by remember { mutableStateOf(false) }
 
     var qrisUrl by remember { mutableStateOf("") }
     var bankName by remember { mutableStateOf("BCA") }
@@ -188,6 +189,32 @@ fun TrackingScreen(
             channel.subscribe()
         } catch (e: Exception) {
             // websocket error fallback
+            e.printStackTrace()
+        }
+    }
+
+    // Notifikasi pesan chat masuk: pantau chat_messages pesanan ini agar ikon
+    // Chat di app bar diberi pin merah saat Admin membalas dan dialog belum dibuka.
+    LaunchedEffect(orderId) {
+        try {
+            val chatChannel = SupabaseClient.realtime.channel("order_track_chat_$orderId")
+            val chatChangeFlow = chatChannel.postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "chat_messages"
+                filter = "order_id=eq.$orderId"
+            }
+            coroutineScope.launch {
+                chatChangeFlow.collectLatest { change ->
+                    if (change is PostgresAction.Insert) {
+                        val newMsg = change.decodeRecord<ChatMessage>()
+                        if (newMsg.senderRole != "Customer" && !showChatDialog) {
+                            hasUnreadChatMessage = true
+                        }
+                    }
+                }
+            }
+            SupabaseClient.realtime.connect()
+            chatChannel.subscribe()
+        } catch (e: Exception) {
             e.printStackTrace()
         }
     }
@@ -343,8 +370,19 @@ fun TrackingScreen(
                 },
                 actions = {
                     if (order?.id != null) {
-                        IconButton(onClick = { showChatDialog = true }) {
-                            Icon(Icons.Default.Chat, contentDescription = "Chat dengan Admin", tint = OrangeJco)
+                        IconButton(onClick = {
+                            showChatDialog = true
+                            hasUnreadChatMessage = false
+                        }) {
+                            BadgedBox(
+                                badge = {
+                                    if (hasUnreadChatMessage) {
+                                        Badge(containerColor = RedPromo)
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.Chat, contentDescription = "Chat dengan Admin", tint = OrangeJco)
+                            }
                         }
                     }
                 },

@@ -1622,7 +1622,12 @@ fun KasirOrderDialog(
                                                     filter {
                                                         eq("order_id", orderId)
                                                         if (newIds.isNotEmpty()) {
-                                                            filterNot("id", io.github.jan.supabase.postgrest.query.filter.FilterOperator.IN, newIds)
+                                                            // PostgREST butuh format "(id1,id2,id3)" untuk operator in/not.in --
+                                                            // meneruskan List<String> langsung ke filterNot() di-toString() jadi
+                                                            // "[id1, id2, id3]" (format Kotlin) dan ditolak server ("failed to
+                                                            // parse filter"), makanya list diformat manual di sini.
+                                                            val idList = newIds.joinToString(",", prefix = "(", postfix = ")")
+                                                            filterNot("id", io.github.jan.supabase.postgrest.query.filter.FilterOperator.IN, idList)
                                                         }
                                                     }
                                                 }

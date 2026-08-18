@@ -836,11 +836,19 @@ fun TabAdminOrders() {
                         Text("Memuat data item pesanan...")
                     }
                 } else {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    // Scroll dipasang di Column LUAR (bukan cuma kotak struk) supaya kalau
+                    // struknya panjang, tombol Cetak Dapur/Resi/Tutup di bawahnya tetap bisa
+                    // dijangkau dengan scroll -- sebelumnya scroll cuma di kotak struk yang
+                    // tidak dibatasi tinggi, jadi dialog kepotong layar dan tombolnya hilang.
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(max = 480.dp)
                             .verticalScroll(rememberScrollState())
+                    ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
                             .background(Color.White)
                             .border(1.dp, Color.LightGray)
                             .padding(16.dp),

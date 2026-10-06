@@ -270,7 +270,7 @@ fun TabAdminOrders() {
             try {
                 val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
                 ordersList = SupabaseClient.db["orders"].select().decodeList<Order>()
-                    .filter { (it.createdAt?.take(10) ?: "") == todayStr }
+                    .filter { SupabaseClient.localOrderDate(it.createdAt) == todayStr }
                     .sortedByDescending { it.orderNumber ?: 0 }
                 
                 driversList = SupabaseClient.db["staff_accounts"].select {

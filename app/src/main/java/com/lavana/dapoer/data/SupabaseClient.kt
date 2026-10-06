@@ -43,6 +43,23 @@ object SupabaseClient {
     val realtime get() = client.realtime
     val storage get() = client.storage
 
+    /** Tanggal lokal perangkat untuk timestamp UTC yang dikirim Supabase. */
+    fun localOrderDate(createdAt: String?): String? {
+        if (createdAt.isNullOrBlank()) return null
+        return try {
+            // Postgres/Supabase returns timestamptz as an ISO timestamp. Parse its
+            // UTC date portion and then format it in the device's local timezone.
+            val utcTimestamp = createdAt.take(19)
+            val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }
+            val parsed = parser.parse(utcTimestamp) ?: return null
+            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(parsed)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun syncDynamicCategories(items: List<MenuItem>) {
         val unique = items.map { it.category }.filter { it.isNotBlank() }.distinct()
         val all = (unique + CUSTOM_CATEGORIES).distinct()
@@ -97,10 +114,8 @@ object SupabaseClient {
         return try {
             val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
                 .format(java.util.Date())
-            val todays = db["orders"].select {
-                filter { gte("created_at", todayStr) }
-            }.decodeList<Order>()
-                .filter { (it.createdAt?.take(10) ?: "") == todayStr }
+            val todays = db["orders"].select().decodeList<Order>()
+                .filter { localOrderDate(it.createdAt) == todayStr }
             (todays.mapNotNull { it.orderNumber }.maxOrNull() ?: 0) + 1
         } catch (e: Exception) {
             e.printStackTrace()

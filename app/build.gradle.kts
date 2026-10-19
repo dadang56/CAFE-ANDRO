@@ -14,8 +14,8 @@ android {
         applicationId = "com.lavana.dapoer"
         minSdk = 24
         targetSdk = 34
-        versionCode = 45
-        versionName = "11.5.8"
+        versionCode = 46
+        versionName = "11.5.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

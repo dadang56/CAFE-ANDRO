@@ -1580,6 +1580,7 @@ fun KasirOrderDialog(
                                     } else ""
                                     val kasirNotes = "Pesanan langsung di kasir$cashSuffix"
                                     scope.launch {
+                                        var newlyCreatedOrderId: String? = null
                                         try {
                                             val savedOrder: Order
                                             if (isEdit) {
@@ -1672,6 +1673,7 @@ fun KasirOrderDialog(
                                                         SupabaseClient.db["orders"].insert(order.copy(customerName = null)) { select() }.decodeSingle<Order>()
                                                     } else throw e
                                                 }
+                                                newlyCreatedOrderId = inserted.id
                                                 val items = cart.map {
                                                     OrderItem(
                                                         orderId = inserted.id!!,
@@ -1688,7 +1690,25 @@ fun KasirOrderDialog(
                                             }
                                             onCreated(savedOrder)
                                         } catch (e: Exception) {
-                                            android.widget.Toast.makeText(context, "Gagal menyimpan: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                                            // Orders dan order_items ditulis melalui dua request. Jika request item
+                                            // gagal, hapus parent yang baru dibuat (CASCADE ikut membersihkan item
+                                            // parsial) agar tidak ada pesanan kosong yang tampak berhasil tersimpan.
+                                            val rollbackError = newlyCreatedOrderId?.let { orderId ->
+                                                runCatching {
+                                                    SupabaseClient.db["orders"].delete {
+                                                        filter { eq("id", orderId) }
+                                                    }
+                                                }.exceptionOrNull()
+                                            }
+                                            val detail = e.localizedMessage ?: "Koneksi atau database bermasalah"
+                                            val rollbackNote = if (rollbackError != null) {
+                                                " Pesanan sementara mungkin masih tercatat; muat ulang daftar."
+                                            } else ""
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "Gagal menyimpan pesanan: $detail.$rollbackNote",
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
                                         } finally {
                                             saving = false
                                         }

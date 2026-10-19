@@ -60,6 +60,18 @@ object SupabaseClient {
         }
     }
 
+    /** UTC timestamp for midnight at the start of the device's local day (e.g. WIB). */
+    fun localDayStartUtc(): String {
+        val localDateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getDefault()
+        }
+        val localMidnight = localDateFormat.parse(localDateFormat.format(java.util.Date()))
+            ?: java.util.Date()
+        return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }.format(localMidnight)
+    }
+
     fun syncDynamicCategories(items: List<MenuItem>) {
         val unique = items.map { it.category }.filter { it.isNotBlank() }.distinct()
         val all = (unique + CUSTOM_CATEGORIES).distinct()
@@ -114,7 +126,13 @@ object SupabaseClient {
         return try {
             val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
                 .format(java.util.Date())
-            val todays = db["orders"].select().decodeList<Order>()
+            // Supabase/PostgREST limits an unordered select to its first 1,000 rows.
+            // With a busy table those can be old orders, silently resetting the
+            // daily counter and hiding today's orders after the client-side filter.
+            val todays = db["orders"].select {
+                filter { gte("created_at", localDayStartUtc()) }
+                order("created_at", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
+            }.decodeList<Order>()
                 .filter { localOrderDate(it.createdAt) == todayStr }
             (todays.mapNotNull { it.orderNumber }.maxOrNull() ?: 0) + 1
         } catch (e: Exception) {

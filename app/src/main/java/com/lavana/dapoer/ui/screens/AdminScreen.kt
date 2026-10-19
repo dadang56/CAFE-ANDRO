@@ -271,7 +271,13 @@ fun TabAdminOrders() {
         coroutineScope.launch {
             try {
                 val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
-                ordersList = SupabaseClient.db["orders"].select().decodeList<Order>()
+                ordersList = SupabaseClient.db["orders"].select {
+                    // Filter on the server before PostgREST's 1,000-row cap. An
+                    // unordered select returns old rows first; after the table
+                    // grew past 1,000 orders, today's rows were never downloaded.
+                    filter { gte("created_at", SupabaseClient.localDayStartUtc()) }
+                    order("created_at", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
+                }.decodeList<Order>()
                     .filter { SupabaseClient.localOrderDate(it.createdAt) == todayStr }
                     .sortedByDescending { it.orderNumber ?: 0 }
                 

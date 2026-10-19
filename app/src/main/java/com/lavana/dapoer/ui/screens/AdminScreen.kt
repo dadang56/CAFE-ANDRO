@@ -265,7 +265,9 @@ fun TabAdminOrders() {
     }
 
     fun refreshData() {
-        isLoading = true
+        // Keep the current list visible while refreshing; only show the empty-state
+        // loader before the first successful load.
+        if (ordersList.isEmpty()) isLoading = true
         coroutineScope.launch {
             try {
                 val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
@@ -286,6 +288,13 @@ fun TabAdminOrders() {
 
     LaunchedEffect(Unit) {
         refreshData()
+        // The admin screen can stay open while a new order arrives. FCM notifies the
+        // device, but the list previously only loaded on entry or when Refresh was
+        // tapped. Poll while this screen is active so new orders appear automatically.
+        while (true) {
+            kotlinx.coroutines.delay(10_000)
+            refreshData()
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {

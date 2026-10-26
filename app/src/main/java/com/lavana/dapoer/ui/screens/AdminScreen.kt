@@ -669,7 +669,7 @@ fun TabAdminOrders() {
                     if (!order.tableNumber.isNullOrBlank()) DetailRow("No. Meja", order.tableNumber)
                     DetailRow("Pembayaran", "${order.paymentMethod} (${order.paymentStatus})")
                     if (!order.notes.isNullOrBlank()) DetailRow("Catatan", order.notes)
-                    if (!order.createdAt.isNullOrBlank()) DetailRow("Waktu Pesan", order.createdAt.take(16).replace("T", " "))
+                    if (!order.createdAt.isNullOrBlank()) DetailRow("Waktu Pesan", SupabaseClient.localOrderDateTime(order.createdAt) ?: "-")
 
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
@@ -916,7 +916,7 @@ fun TabAdminOrders() {
                                 color = Color.Black
                             )
                             Text(
-                                text = "Tanggal   : ${selectedOrderForPrint?.createdAt?.take(16)?.replace("T", " ") ?: ""}",
+                                text = "Tanggal   : ${SupabaseClient.localOrderDateTime(selectedOrderForPrint?.createdAt) ?: ""}",
                                 fontSize = 11.sp,
                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                 color = Color.Black
@@ -6020,7 +6020,7 @@ fun buildOrderReceiptElements(
     elements.add(ReceiptElement.Divider)
 
     elements.add(ReceiptElement.TextLine("No. Order : #${order.orderNumber}", bold = true))
-    elements.add(ReceiptElement.TextLine("Tanggal   : ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}"))
+    elements.add(ReceiptElement.TextLine("Tanggal   : ${SupabaseClient.localOrderDateTime(order.createdAt) ?: ""}"))
     elements.add(ReceiptElement.TextLine("Tipe      : ${order.orderType}"))
     if (!order.customerPhone.isNullOrBlank()) {
         elements.add(ReceiptElement.TextLine("Telp      : ${order.customerPhone}"))
@@ -6079,7 +6079,7 @@ fun buildKitchenReceiptElements(
     elements.add(ReceiptElement.TextLine("STRUK DAPUR", bold = true, align = ReceiptAlign.CENTER, doubleHeight = true))
     elements.add(ReceiptElement.Divider)
     elements.add(ReceiptElement.TextLine("No. Order : #${order.orderNumber}", bold = true))
-    elements.add(ReceiptElement.TextLine("Waktu     : ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}"))
+    elements.add(ReceiptElement.TextLine("Waktu     : ${SupabaseClient.localOrderDateTime(order.createdAt) ?: ""}"))
     elements.add(ReceiptElement.TextLine("Tipe      : ${order.orderType}"))
     if (order.orderType == "Dine In" && !order.tableNumber.isNullOrBlank()) {
         elements.add(ReceiptElement.TextLine("No. Meja  : ${order.tableNumber}"))

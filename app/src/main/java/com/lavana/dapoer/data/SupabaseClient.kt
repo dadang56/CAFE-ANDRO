@@ -66,14 +66,21 @@ object SupabaseClient {
     }
 
     private fun parseOrderTimestamp(createdAt: String): java.util.Date {
-        // ISO_INSTANT accepts the Z suffix and fractional seconds returned by
-        // Postgres. Instant.toEpochMilli also handles timestamps with offsets.
-        val instant = try {
-            java.time.Instant.parse(createdAt)
-        } catch (_: Exception) {
-            java.time.OffsetDateTime.parse(createdAt).toInstant()
+        // Use SimpleDateFormat so parsing also works on Android API 24-25 where
+        // java.time is not part of the platform. Supabase may include fractional
+        // seconds; strip them because the report only displays minute precision.
+        val normalized = createdAt.trim().replace(
+            Regex("\\.\\d+(?=(?:Z|[+-]\\d{2}:?\\d{2})$)"),
+            ""
+        )
+        val hasOffset = normalized.endsWith("Z") ||
+            Regex("[+-]\\d{2}:?\\d{2}$").containsMatchIn(normalized)
+        val pattern = if (hasOffset) "yyyy-MM-dd'T'HH:mm:ssXXX" else "yyyy-MM-dd'T'HH:mm:ss"
+        val parser = java.text.SimpleDateFormat(pattern, java.util.Locale.US).apply {
+            isLenient = false
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
         }
-        return java.util.Date.from(instant)
+        return parser.parse(normalized) ?: throw IllegalArgumentException("Invalid order timestamp")
     }
 
     /** UTC timestamp for midnight at the start of the device's local day (e.g. WIB). */

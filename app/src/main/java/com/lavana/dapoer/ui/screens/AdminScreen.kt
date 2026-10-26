@@ -4074,27 +4074,40 @@ fun TabAdminBanners() {
 fun TabAdminReports() {
     val coroutineScope = rememberCoroutineScope()
     var completedOrders by remember { mutableStateOf<List<Order>>(emptyList()) }
-    var menuItemsMap by remember { mutableStateOf<Map<String, MenuItem>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     var reportLoadError by remember { mutableStateOf<String?>(null) }
     var reportType by remember { mutableStateOf("Harian") } // "Harian" or "Bulanan"
     val context = LocalContext.current
     var showPrintPreview by remember { mutableStateOf(false) }
 
+    val todayStr = remember {
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+    }
+    val thisMonthStr = remember {
+        java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
+    }
+    var selectedDate by remember { mutableStateOf(todayStr) }
+    var selectedMonth by remember { mutableStateOf(thisMonthStr) }
+
     fun loadReportData() {
         isLoading = true
         reportLoadError = null
         coroutineScope.launch {
             try {
-                // Fetch completed orders
+                // Query only the selected local period. An unbounded orders query can
+                // hit Supabase's row cap and omit recent transactions entirely.
+                val (periodStartUtc, periodEndUtc) = SupabaseClient.localReportPeriodUtcBounds(
+                    reportType, selectedDate, selectedMonth
+                )
                 val allOrders = SupabaseClient.db["orders"].select {
-                    filter { eq("status", "Selesai") }
+                    filter {
+                        eq("status", "Selesai")
+                        gte("created_at", periodStartUtc)
+                        lt("created_at", periodEndUtc)
+                    }
+                    order("created_at", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
                 }.decodeList<Order>()
-                completedOrders = allOrders.sortedByDescending { it.createdAt }
-
-                // Fetch menu items for names
-                val menus = SupabaseClient.db["menu_items"].select().decodeList<MenuItem>()
-                menuItemsMap = menus.associateBy { it.id }
+                completedOrders = allOrders
             } catch (e: Exception) {
                 e.printStackTrace()
                 reportLoadError = e.localizedMessage ?: "Gagal memuat data laporan."
@@ -4104,32 +4117,10 @@ fun TabAdminReports() {
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reportType, selectedDate, selectedMonth) {
         loadReportData()
     }
-
-    val todayStr = remember {
-        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
-    }
-    val thisMonthStr = remember {
-        java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
-    }
-
-    var selectedDate by remember { mutableStateOf(todayStr) }
-    var selectedMonth by remember { mutableStateOf(thisMonthStr) }
-
-    val filteredOrders = remember(completedOrders, reportType, selectedDate, selectedMonth) {
-        completedOrders.filter { order ->
-            // created_at is a UTC timestamp from Supabase. Report periods follow
-            // the device's local calendar, matching the date shown in the picker.
-            val datePart = SupabaseClient.localOrderDate(order.createdAt).orEmpty()
-            if (reportType == "Harian") {
-                datePart == selectedDate
-            } else {
-                datePart.startsWith(selectedMonth)
-            }
-        }
-    }
+    val filteredOrders = completedOrders
 
     val totalRevenue = filteredOrders.sumOf { it.total }
     val totalOrdersCount = filteredOrders.size

@@ -65,6 +65,30 @@ object SupabaseClient {
         }
     }
 
+    /** UTC half-open bounds for a day or month selected in the device's local time. */
+    fun localReportPeriodUtcBounds(
+        reportType: String,
+        selectedDate: String,
+        selectedMonth: String
+    ): Pair<String, String> {
+        val isMonthly = reportType == "Bulanan"
+        val localStartText = if (isMonthly) "$selectedMonth-01" else selectedDate
+        val localStart = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).apply {
+            isLenient = false
+            timeZone = java.util.TimeZone.getDefault()
+        }.parse(localStartText) ?: throw IllegalArgumentException("Invalid report period")
+
+        val startCalendar = java.util.Calendar.getInstance().apply { time = localStart }
+        val endCalendar = startCalendar.clone() as java.util.Calendar
+        endCalendar.add(java.util.Calendar.DAY_OF_MONTH, if (isMonthly) 0 else 1)
+        if (isMonthly) endCalendar.add(java.util.Calendar.MONTH, 1)
+
+        val utcFormatter = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+        return utcFormatter.format(startCalendar.time) to utcFormatter.format(endCalendar.time)
+    }
+
     private fun parseOrderTimestamp(createdAt: String): java.util.Date {
         // Use SimpleDateFormat so parsing also works on Android API 24-25 where
         // java.time is not part of the platform. Supabase may include fractional

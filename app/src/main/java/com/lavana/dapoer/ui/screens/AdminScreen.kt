@@ -4076,12 +4076,14 @@ fun TabAdminReports() {
     var completedOrders by remember { mutableStateOf<List<Order>>(emptyList()) }
     var menuItemsMap by remember { mutableStateOf<Map<String, MenuItem>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
+    var reportLoadError by remember { mutableStateOf<String?>(null) }
     var reportType by remember { mutableStateOf("Harian") } // "Harian" or "Bulanan"
     val context = LocalContext.current
     var showPrintPreview by remember { mutableStateOf(false) }
 
     fun loadReportData() {
         isLoading = true
+        reportLoadError = null
         coroutineScope.launch {
             try {
                 // Fetch completed orders
@@ -4095,6 +4097,7 @@ fun TabAdminReports() {
                 menuItemsMap = menus.associateBy { it.id }
             } catch (e: Exception) {
                 e.printStackTrace()
+                reportLoadError = e.localizedMessage ?: "Gagal memuat data laporan."
             } finally {
                 isLoading = false
             }
@@ -4117,7 +4120,9 @@ fun TabAdminReports() {
 
     val filteredOrders = remember(completedOrders, reportType, selectedDate, selectedMonth) {
         completedOrders.filter { order ->
-            val datePart = order.createdAt?.take(10) ?: ""
+            // created_at is a UTC timestamp from Supabase. Report periods follow
+            // the device's local calendar, matching the date shown in the picker.
+            val datePart = SupabaseClient.localOrderDate(order.createdAt).orEmpty()
             if (reportType == "Harian") {
                 datePart == selectedDate
             } else {
@@ -4152,7 +4157,7 @@ fun TabAdminReports() {
                 appendLine(" Tidak ada transaksi.")
             } else {
                 filteredOrders.forEach { order ->
-                    val time = order.createdAt?.takeLast(8)?.take(5) ?: ""
+                    val time = SupabaseClient.localOrderDateTime(order.createdAt)?.takeLast(5) ?: ""
                     appendLine(String.format(" #%d [%s] Rp %,.0f (%s)", order.orderNumber, time, order.total, order.paymentMethod))
                 }
             }
@@ -4280,6 +4285,14 @@ fun TabAdminReports() {
                 }
             }
         } else {
+            if (reportLoadError != null) {
+                Text(
+                    "Gagal memuat laporan: $reportLoadError. Tekan tombol muat ulang untuk mencoba lagi.",
+                    color = RedPromo,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Card(
@@ -4382,7 +4395,7 @@ fun TabAdminReports() {
                                     ) {
                                         Column {
                                             Text("Pesanan #${order.orderNumber}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                            Text("Waktu: ${order.createdAt?.take(16)?.replace("T", " ") ?: ""}", fontSize = 10.sp, color = Color.Gray)
+                                            Text("Waktu: ${SupabaseClient.localOrderDateTime(order.createdAt) ?: "-"}", fontSize = 10.sp, color = Color.Gray)
                                         }
                                         Column(horizontalAlignment = Alignment.End) {
                                             Text("Rp ${String.format("%,.0f", order.total)}", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = ForestGreen)

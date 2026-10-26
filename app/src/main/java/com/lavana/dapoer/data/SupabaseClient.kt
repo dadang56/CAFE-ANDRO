@@ -47,17 +47,33 @@ object SupabaseClient {
     fun localOrderDate(createdAt: String?): String? {
         if (createdAt.isNullOrBlank()) return null
         return try {
-            // Postgres/Supabase returns timestamptz as an ISO timestamp. Parse its
-            // UTC date portion and then format it in the device's local timezone.
-            val utcTimestamp = createdAt.take(19)
-            val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
-                timeZone = java.util.TimeZone.getTimeZone("UTC")
-            }
-            val parsed = parser.parse(utcTimestamp) ?: return null
-            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(parsed)
+            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                .format(parseOrderTimestamp(createdAt))
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** Supabase timestamptz rendered as local device time for reports and receipts. */
+    fun localOrderDateTime(createdAt: String?): String? {
+        if (createdAt.isNullOrBlank()) return null
+        return try {
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                .format(parseOrderTimestamp(createdAt))
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun parseOrderTimestamp(createdAt: String): java.util.Date {
+        // ISO_INSTANT accepts the Z suffix and fractional seconds returned by
+        // Postgres. Instant.toEpochMilli also handles timestamps with offsets.
+        val instant = try {
+            java.time.Instant.parse(createdAt)
+        } catch (_: Exception) {
+            java.time.OffsetDateTime.parse(createdAt).toInstant()
+        }
+        return java.util.Date.from(instant)
     }
 
     /** UTC timestamp for midnight at the start of the device's local day (e.g. WIB). */
